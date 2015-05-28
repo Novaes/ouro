@@ -1,7 +1,6 @@
 local cstdio = terralib.includec("stdio.h")
 local cstdlib = terralib.includec("stdlib.h")
 local cstring = terralib.includec("string.h")
-local cmath = terralib.includec("math.h")
 
 pageSize = 4*1024
 verbose = false
