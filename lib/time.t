@@ -1,0 +1,87 @@
+local C = terralib.includecstring [[
+
+#include <stdint.h>
+#include <sys/time.h>
+#include <time.h>
+
+const uint64_t usInSec = 1000000;
+const uint64_t nsInSec = 1000000000;
+
+inline uint64_t nowUs() {
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return ((uint64_t)tv.tv_sec) * usInSec + tv.tv_usec;
+}
+
+inline uint64_t nowNs() {
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  return ((uint64_t)ts.tv_sec) * nsInSec + ts.tv_nsec;
+}
+
+]]
+
+local S = require "std"
+
+terra nowUs()
+  return C.nowUs()
+end
+
+terra nowNs()
+  return C.nowNs()
+end
+
+terra runBenchmark(fn : {} -> {})
+  var maxIter : int = 1000
+  var maxTime : int = 1000000000 -- 1 second
+
+  -- collect execution times
+  var times = [S.Vector(uint64)].salloc():init()
+  var i : int = 0
+  var totalTime : uint64 = 0
+  while i < maxIter and totalTime < maxTime do
+    var start : uint64 = nowNs()
+    fn()
+    var elapsed : uint64 = nowNs() - start
+
+    -- insert in order - no sort in terra :(
+    var j : int = 0
+    while j < i do
+      if (elapsed <= times(j)) then
+        break
+      end
+      j = j + 1
+    end
+    times:insert(j, elapsed)
+
+    i = i + 1
+    totalTime = totalTime + elapsed
+  end
+
+  -- discard outliers
+  var size : int = times:size() - 1
+  while size >= 0 do
+    if times(size) <= 2 * times(0) then
+      break
+    end
+    size = size - 1
+  end
+  size = size + 1
+
+  -- computes p50 - will change to mode soon
+  var p50 : uint = size * 0.5
+  return times(p50)
+end
+
+
+--[[ EXAMPLE
+terra testing()
+  nowNs()
+end
+
+terra main()
+  print(runBenchmark(testing))
+end
+
+main()
+]]
