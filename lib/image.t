@@ -1,7 +1,6 @@
 local cstdio = terralib.includec("stdio.h")
 local cstdlib = terralib.includec("stdlib.h")
 local cstring = terralib.includec("string.h")
-
 pageSize = 4*1024
 verbose = false
 
@@ -53,7 +52,7 @@ unsigned char* loadPPM_UC(const char *filename, int* width, int* height, int* ch
     *channels = 1; 
   }
 
-    int bytes = 1;
+  int bytes = 1;
 
   if( maxC <=  255 ){
 //    printf("error, this function doesn't support 16 bit\n");
@@ -859,11 +858,12 @@ local terra loadBMP_UC(filename : &int8, width : &int, height : &int, channels :
 
   if (@channels > 2) then
     --for (unsigned int j=0; j<size; j+=*channels ) do -- reverse all of the colors. (bgr -> rgb)
+    var i=0;
     for j=0,size,(@channels) do
       temp = data[j];
       data[j] = data[j+2];
       data[j+2] = temp;
-    
+
       data[j]=data[j];
       data[j+1]=data[j+1];
       data[j+2]=data[j+2];
@@ -1327,7 +1327,7 @@ terra Image:SOAAOS(toAOS : bool)
 
     cstdlib.posix_memalign( [&&opaque](&dst), pageSize, size)
 
--- TODO blocking?!
+    -- TODO blocking?!
 
     for y=0,self.height do
       for x=0,self.width do

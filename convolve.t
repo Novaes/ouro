@@ -1,13 +1,14 @@
 require "lib/image"
+require "lib/time"
 
 local cstdio = terralib.includec("stdio.h")
 local cstdlib = terralib.includec("stdlib.h")
 local cmath = terralib.includec("math.h")
 
 struct Filter { 
-  width : int, 
-  height : int, 
-  stride : int, 
+  width : int,
+  height : int,
+  stride : int,
   divisor: int,
   floating : bool, -- is this floating point?
   weights : &double
@@ -29,6 +30,12 @@ terra Filter:init(
   return self
 end
 
+terra memRGB(width: int, height: int)
+  return ([&uint8](cstdlib.malloc(width * height * sizeof(uint8)))), 
+  ([&uint8](cstdlib.malloc(width * height * sizeof(uint8)))), 
+  ([&uint8](cstdlib.malloc(width * height * sizeof(uint8))))
+end
+
 terra Filter:load(argc: int, argv: &rawstring)
   var width : int = cstdlib.atoi(argv[1])
   var height: int = cstdlib.atoi(argv[2])
@@ -36,11 +43,44 @@ terra Filter:load(argc: int, argv: &rawstring)
   var weights = [&double](cstdlib.malloc(width * height * sizeof(double)))
   for i=4,argc do
     weights[i-4] = cstdlib.atoi(argv[i])
-    --cstdio.printf("weights[%d]: %d\n", i-4, weights[i-4]);
   end
   return self:init(width,height,width,divisor,false,weights)
 end
 
+terra Filter:free()
+  cstdlib.free(self.weights)
+end
+
+terra generateRGB(w: int, h: int, data: &uint8): {&uint8, &uint8, &uint8}
+  var r: &uint8, g: &uint8, b: &uint8 = memRGB(w,h)
+  var i=0
+  for j=0,(w * h * 3),3 do
+    r[i] = data[j]
+  	g[i] = data[j+1]
+  	b[i] = data[j+2]
+  	i = i+1
+  end
+  return r,g,b	
+end
+
+terra free(r: &uint8, g: &uint8, b: &uint8, Rout: &uint8, Gout: &uint8, Bout: &uint8)
+  cstdlib.free(r)
+  cstdlib.free(g)
+  cstdlib.free(b)
+  cstdlib.free(Rout)
+  cstdlib.free(Gout)
+  cstdlib.free(Bout)
+end
+
+terra bound(d: int, max: int) : uint8
+	if d < 0 then
+		return 0
+	elseif d > max then
+		return max
+	else 
+		return d
+	end
+end
 
 terra Image:slowconvolve(ker: Filter)
   var iRows = self.width
@@ -50,50 +90,31 @@ terra Image:slowconvolve(ker: Filter)
   var kCols = ker.height
   var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
   var kernel: &double = ker.weights
-  var data: &uint8 = [&uint8](self.data)
-  var output : &int = [&int](cstdlib.malloc(self.width * self.height * sizeof(int)))  
+  var data: &uint8 = [&uint8](self.dataPtr)
   
-  --[[ if self.dataPtr ~= self.data then cstdio.printf("STRIDED IMAGE")  end ]]
-  --[[cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d",iRows, iCols, channels, kRows, kCols, kCenterX, kCenterY) ]]
+  -- check arguments
+  -- if self.dataPtr ~= self.data then cstdio.printf("STRIDED IMAGE")  end 
+  --cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d \n",iRows, iCols, channels, kRows, kCols, kCenterX, kCenterY)
   
-  -- TODO test separated, using it to fit in a L1 cache during the loop
-  var r = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-  var g = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-  var b = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-
-  if(self.channels == 3) then
-    var i=0
-    for j=0,(self.width * self.height * channels),channels do
-      r[i] = data[j]
-      g[i] = data[j+1]
-      b[i] = data[j+2]
-      i = i+1
-    end
-  end
-
-  var inputData : &uint8
-  var outputData : &uint8
-
-  --[[ -- check colors
-  for i=0, self.width * self.height do
-    cstdio.printf(" %d ",r[i])
-  end
-  ]]
-
-  var Rout = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-  var Gout = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-  var Bout = [&uint8](cstdlib.malloc(self.width * self.height * sizeof(uint8)))
-
---[[
-  cstdio.printf("weights")
+  var r: &uint8, g: &uint8, b: &uint8 = generateRGB(self.width,self.height,data)
+  var inputData : &uint8, outputData : &uint8
+  var Rout: &uint8, Gout: &uint8, Bout: &uint8 = memRGB(self.width,self.height)
+  
+  --[[
+  --check weights
+  cstdio.printf("weights: \n")
   for i=0, kRows do
-      for j=0, kCols do cstdio.printf("\n%d",ker.weights[kCols * i + j]) end 
+      for j=0, kCols do cstdio.printf(" %d ",[int](ker.weights[kCols * i + j])) end 
       cstdio.printf("\n")
-  end
-]]
+  end]]
+
+
+--[[for j=0,(iRows * iCols) do
+      cstdio.printf(" %d ", r[j])
+    end
+    ]]
 
   for p=0,channels do
-
     if p == 0 then
       inputData = r
       outputData = Rout
@@ -104,7 +125,11 @@ terra Image:slowconvolve(ker: Filter)
       inputData = b
       outputData = Bout
     end
-
+--[[  
+  for j=0,(iRows * iCols) do
+    cstdio.printf(" %d ", inputData[j])
+  end
+]]
     var sum: double
     var mm: int 
     var ii: int
@@ -125,7 +150,8 @@ terra Image:slowconvolve(ker: Filter)
             end
           end
         end
-        outputData[i*iCols + j] =  sum
+        -- outputData[i*iCols + j] = bound(cmath.floor(sum/ker.divisor),255)
+        outputData[i*iCols + j] = sum
       end
     end
   end
@@ -133,12 +159,11 @@ terra Image:slowconvolve(ker: Filter)
   -- re-construct img data
   if (channels == 3) then
     for j=0,(self.width * self.height) do --same type to assingment
-      --output[3*j], output[(3*j)+1], output[(3*j)+2] = Rout[j], Gout[j], Bout[j]
       data[3*j], data[(3*j)+1], data[(3*j)+2] = Rout[j], Gout[j], Bout[j]
     end
   end
 
-  return output
+  free(r,b,g,Rout,Gout,Bout)
 end
 
 terra Filter:load()
@@ -155,29 +180,29 @@ terra Filter:load()
   return self:init(width,height,width,divisor,false,weights)
 end
 
-local terra loadAndRun(argc: int, argv: &rawstring) --gettime : {} -> double
+local terra loadAndRun(argc: int, argv: &rawstring)
 
-  --loading image
+  -- loading image
   var inp: Image
-  inp:load("lena.bmp")
+  inp:load("images/lena.bmp")
 
-  --loading kernel
+  -- loading kernel
   var kernel: Filter
   kernel:load(argc, argv)
   --kernel:load()
-
+  
+  -- convolve
   inp:slowconvolve(kernel)
+  
+  -- print(runBenchmark(testing))
 
   var out: Image
   out = inp
-  out:save("lena_out.bmp")
-  out:toFloat32()
-  out:save("lena_out2.bmp")
+  out:save("images/lena_out.bmp")
   out:free()
   return 0
 end
 
 terralib.saveobj("my_convolution.o",{ loadAndRun = loadAndRun })
-
 --run until it does not compare with another image convolution
 terralib.saveobj("my_convolution",{ main = loadAndRun })

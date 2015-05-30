@@ -23,9 +23,11 @@ end
 
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
 
-function genkernel(NB, RM, RN, V,alpha,boundary)
+function genkernel(NB, RM, RN, V, alpha, boundary)
 	local M,N,K, boundaryargs
-	if boundary then
+
+	-- if one of the parameters is lower than NB then receive the usual
+	if boundary then 
 		M,N,K = symbol(int64,"M"),symbol(int64,"N"),symbol(int64,"K")
 		boundaryargs = terralib.newlist({M,N,K})
 	else
@@ -37,16 +39,20 @@ function genkernel(NB, RM, RN, V,alpha,boundary)
 	local lda,ldb,ldc = symbol("lda"),symbol("ldb"),symbol("ldc")
 	local a,b,c,caddr = symmat("a",RM), symmat("b",RN), symmat("c",RM,RN), symmat("caddr",RM,RN)
 	local k = symbol("k")
-	
+
 	local loadc,storec = terralib.newlist(),terralib.newlist()
 	local VT = vector(number,V)
 	local VP = &VT
+	
+	-- it will take V elements at one c position
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
+			--alpha C mult, load C to fast memory (register vector), multiply it by alpha
 			loadc:insert(quote
 				var [caddr[m][n]] = C + m*ldc + n*V
 				var [c[m][n]] = alpha * unalignedload(VP([caddr[m][n]]))
 			end)
+			--put back in the slow memory, from register vector to memory
 			storec:insert(quote
 				unalignedstore(VP([caddr[m][n]]),[c[m][n]])
 			end)
@@ -54,7 +60,7 @@ function genkernel(NB, RM, RN, V,alpha,boundary)
 	end
 
 	local calcc = terralib.newlist()
-	
+
 	for n = 0, RN-1 do
 		calcc:insert(quote
 			var [b[n]] = unalignedload(VP(&B[n*V]))
@@ -102,6 +108,7 @@ local IO = terralib.includec("stdio.h")
 local terra min(a : int, b : int)
 	return terralib.select(a < b, a, b)
 end
+
 function blockedloop(N,M,K,blocksizes,bodyfn)
   local function generatelevel(n,ii,jj,kk,bb0,bb1,bb2)
     if n > #blocksizes then
@@ -172,6 +179,8 @@ if dotune then
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
+
+					-- same until here
 					local my_dgemm = generatedgemm(b,5,rm,rn,v)
 					if my_dgemm then
 						print(b,rm,rn,v)
@@ -187,12 +196,18 @@ if dotune then
 							break
 						end
 						print(i,unpack(times))
+						
+
 						local avg = times[1]	
 						if  best.gflops < avg then
 							best = { gflops = avg, b = b, rm = rm, rn = rn, v = v }
 							terralib.tree.printraw(best)
 						end
+
+						
 					end
+
+
 				end
 			end
 		end

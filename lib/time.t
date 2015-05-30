@@ -1,31 +1,20 @@
+
 local C = terralib.includecstring [[
 
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
 
-const uint64_t usInSec = 1000000;
 const uint64_t nsInSec = 1000000000;
 
-inline uint64_t nowUs() {
+inline uint64_t nowNs() {
   struct timeval tv;
   gettimeofday(&tv, 0);
-  return ((uint64_t)tv.tv_sec) * usInSec + tv.tv_usec;
+  return ((uint64_t)tv.tv_sec) * nsInSec + /*[tv.tv_nsec]*/tv.tv_usec; 
 }
-
-inline uint64_t nowNs() {
-  struct timespec ts;
-  clock_gettime(CLOCK_REALTIME, &ts);
-  return ((uint64_t)ts.tv_sec) * nsInSec + ts.tv_nsec;
-}
-
 ]]
 
 local S = require "std"
-
-terra nowUs()
-  return C.nowUs()
-end
 
 terra nowNs()
   return C.nowNs()
@@ -73,8 +62,7 @@ terra runBenchmark(fn : {} -> {})
   return times(p50)
 end
 
-
---[[ EXAMPLE
+--[[
 terra testing()
   nowNs()
 end
@@ -82,6 +70,6 @@ end
 terra main()
   print(runBenchmark(testing))
 end
-
 main()
 ]]
+
