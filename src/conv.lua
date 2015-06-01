@@ -55,7 +55,6 @@ function slide(inputData, kernel, rm, rn, rmm, rnn)
   end
 end
 
-
 function naiveConvolve(inputData, kernel)
   local kCenterX, kCenterY = math.floor(kRows/2), math.floor(kCols/2)
   output = {{0,0,0},{0,0,0},{0,0,0}}
@@ -78,34 +77,40 @@ function naiveConvolve(inputData, kernel)
   end
 end
 
-
-local function autotune()  
+local function autotune()
   --get image, decompose on RGB, do the convolution operation
   local kernel = getKernel()
   local image = getImage()
-  
+
   --it should be a method of image that receives a kernel flipped: flip() is a kernel method to flip
   kernel = flipkernel(kernel,kRows,kCols)
-  
+
   local blockM = {1,2}
   local blockN = {1,2}
   local blockMM = {1,2}
   local blockNN = {2,1}
+  --local harness = require("lib/matrixtestharness")
+  local before = terralib.currenttimeinseconds()
   
+  local time
+  io.write("Parameters: \n")
   for _,rm in ipairs(blockM) do
     for _,rn in ipairs(blockN) do
       for _,rmm in ipairs(blockMM) do
-        for _,rnn in ipairs(blockNN) do 
+        for _,rnn in ipairs(blockNN) do
           for i=1,channels do
             --tree of times, take the best one 
-            io.write("Parameters, rm: " .. rm .. " rn: " .. rn .. " rmm: " .. rmm .. " rnn: " .. rnn .. "\n")
+            time = terralib.currenttimeinseconds() - before
+            before = terralib.currenttimeinseconds()
+            io.write("rm: " .. rm .. " rn: " .. rn .. " rmm: " .. rmm .. " rnn: " .. rnn .. "| Time: " .. time .. "\n") 
+            io.write()
             slide(image, kernel,rm,rn,rmm,rnn)
             check()
           end
-        end  
-      end  
+        end
+      end
     end
-  end 
+  end
 end
 
 function equal(a,b,M,N)
@@ -146,31 +151,12 @@ end
 
 IO = terralib.includec("stdio.h")
 
-
-terra tcheck()
-  var tRows: int, tCols: int = 3, 3
-  -- test[0][0] = -13
-  -- test[0][1] = -20
-  -- test[0][2] = -17
-  -- test[1][0] = -18
-  -- test[1][1] = -24
-  -- test[1][2] = -18
-  -- test[2][0] = 13
-  -- test[2][1] = 20
-  -- test[2][2] = 17
-
-  for i = 0,3 do
-    for j = 0,3 do
-      --IO.printf("%d ",c.test[i][j])
-       -- if output[i][j] ~= c.test[i][j] then
-       --  IO.printf("error")
-       --  return false
-       -- end
-    end
-  --   IO.printf("\n")
-  -- end
-  end
-end
+original = terralib.includecstring [[
+  int get(int i, int j){
+    int test[3][3] = {{-13,-20,-17}, {-18,-24,-18}, {13,  20, 17}};
+    return test[i][j];
+  }
+]]
 
 function check()
   local test, tRows, tCols = {  {-13,-20,-17},
@@ -229,35 +215,5 @@ terra printl()
   [check()]
 end
 
-
-
-terra main()
-  var kernel : int[3][3]
-
-  var img : int[3][3]
-
-  var N = 8
-  [blockedloop(N, {4,2,1}, function(i,j)
-      return 
-        quote
-          --IO.printf("%d %d\n",i,j)
-          a[i][j] = c
-          c = c + 1
-        end
-    end)
-  ]
-
-  --display
-  for i = 0,N do
-    for j = 0,N do
-      IO.printf("%d\t",a[i][j])
-    end
-    IO.printf("\n")
-  end
-end
-
---autotune()
---main()
 --printl()
---check()
-main()
+autotune()

@@ -1,5 +1,6 @@
 local number = double
 local alignment = 8
+
 local dotune = true
 
 function symmat(name,I,...)
@@ -21,9 +22,9 @@ local function unalignedstore(addr,v)
 	return `terralib.attrstore(addr,v, { align = alignment })
 end
 
+
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
 
--- ==============================================================================
 function genkernel(NB, RM, RN, V, alpha, boundary)
 	local M,N,K, boundaryargs
 
@@ -45,6 +46,7 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 	local VT = vector(number,V)
 	local VP = &VT
 	
+
 	-- it will take V elements at one c position
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
@@ -79,7 +81,7 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 			end)
 		end
 	end
-
+	
 	local result = terra([A] : &number, [B] : &number, [C] : &number, [lda] : int64,[ldb] : int64,[ldc] : int64,[boundaryargs])
 		for [mm] = 0, M, RM do
 			for [nn] = 0, N,RN*V do
@@ -110,8 +112,6 @@ local terra min(a : int, b : int)
 	return terralib.select(a < b, a, b)
 end
 
--- ==============================================================================
--- Change for the convolution one, add the ll
 function blockedloop(N,M,K,blocksizes,bodyfn)
   local function generatelevel(n,ii,jj,kk,bb0,bb1,bb2)
     if n > #blocksizes then
@@ -126,8 +126,8 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
   end
   return generatelevel(1,0,0,0,N,M,K)
 end
--- ==============================================================================
-function generatedgemm(NB,NBF,RM,RN,V)
+
+function generatedgemm(NB,NBF, RM,RN ,V)
 	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
 	end
@@ -140,8 +140,7 @@ function generatedgemm(NB,NBF,RM,RN,V)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		           beta : number, C : &number, ldc : int)
-		[ blockedloop(N,M,K,{NB2,NB},
-								function(m,n,k) return quote
+		[ blockedloop(N,M,K,{NB2,NB},function(m,n,k) return quote
 								var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
 								var isboundary = MM < NB or NN < NB or KK < NB
 								var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
@@ -182,32 +181,36 @@ if dotune then
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
-				-- for_,rnn in ipairs(regblocks)
-				--
-				for _,v in ipairs(vectors) do
-					-- same until here
-					local my_dgemm = generatedgemm(b,5,rm,rn,v)
-					if my_dgemm then
-						print(b,rm,rn,v)
-						my_dgemm:compile()
-						local i = math.floor(tunefor / b) * b
-						local avg = 0
-						local ctyp
-						local s, times = harness.timefunctions(tostring(number),i,i,i,function(M,K,N,A,B,C)
-							my_dgemm(nil,M,N,K,1.0,A,K,B,N,0.0,C,N)
-						end)
-						if not s then
-							print("<error>")
-							break
+				-- for_,rmm in ipairs(regblocks) do
+					-- for_,rnn in ipairs(regblocks) do
+						for _,v in ipairs(vectors) do
+							-- same until here
+							local my_dgemm = generatedgemm(b,5,rm,rn,v)
+							
+							if my_dgemm then
+								io("Parameters" .. b,rm,rn,v)
+								my_dgemm:compile()
+								local i = math.floor(tunefor / b) * b
+								local avg = 0
+								local ctyp
+								
+								local s, times = harness.timefunctions(tostring(number),i,i,i,function(M,K,N,A,B,C)
+									my_dgemm(nil,M,N,K,1.0,A,K,B,N,0.0,C,N)
+								end)
+
+								if not s then	print("<error>")	break	end --error
+								print(i,unpack(times))
+								local avg = times[1]
+								if  best.gflops < avg then
+									best = { gflops = avg, b = b, rm = rm, rn = rn, v = v }
+									terralib.tree.printraw(best)
+								end
+							end
+
+
 						end
-						print(i,unpack(times))
-						local avg = times[1]	
-						if  best.gflops < avg then
-							best = { gflops = avg, b = b, rm = rm, rn = rn, v = v }
-							terralib.tree.printraw(best)
-						end
-					end
-				end
+					--end
+				--end
 			end
 		end
 	end
