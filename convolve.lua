@@ -53,10 +53,10 @@ terra Filter:flip()
     self.weights = tmp
 end
 
-terra memRGB(width: int, height: int)
-  return ([&uint8](cstdlib.calloc(width * height, sizeof(uint8)))), 
-  ([&uint8](cstdlib.calloc(width * height, sizeof(uint8)))), 
-  ([&uint8](cstdlib.calloc(width * height, sizeof(uint8))))
+terra memDoubleRGB(width: int, height: int)
+  return ([&double](cstdlib.calloc(width * height, sizeof(double)))), 
+  ([&double](cstdlib.calloc(width * height, sizeof(double)))), 
+  ([&double](cstdlib.calloc(width * height, sizeof(double))))
 end
 
 terra Filter:load(argc: int, argv: &rawstring)
@@ -75,7 +75,10 @@ terra Filter:free()
 end
 
 terra generateRGB(w: int, h: int, data: &uint8): {&uint8, &uint8, &uint8}
-  var r: &uint8, g: &uint8, b: &uint8 = memRGB(w,h)
+  var r: &uint8 = ([&uint8](cstdlib.calloc(w * h, sizeof(uint8))))
+  var g: &uint8 = ([&uint8](cstdlib.calloc(w * h, sizeof(uint8))))
+  var b: &uint8 = ([&uint8](cstdlib.calloc(w * h, sizeof(uint8))))
+
   var i=0
   for j=0,(w * h * 3),3 do
     r[i] = data[j]
@@ -86,7 +89,7 @@ terra generateRGB(w: int, h: int, data: &uint8): {&uint8, &uint8, &uint8}
   return r,g,b	
 end
 
-terra free(r: &uint8, g: &uint8, b: &uint8, Rout: &uint8, Gout: &uint8, Bout: &uint8)
+terra free(r: &uint8, g: &uint8, b: &uint8, Rout: &double, Gout: &double, Bout: &double)
   cstdlib.free(r)
   cstdlib.free(g)
   cstdlib.free(b)
@@ -95,26 +98,14 @@ terra free(r: &uint8, g: &uint8, b: &uint8, Rout: &uint8, Gout: &uint8, Bout: &u
   cstdlib.free(Bout)
 end
 
-terra bound(d: int, max: int) : uint8
+terra bound(d: double, max: int) : uint8
 	if d < 0 then
 		return 0
 	elseif d > max then
-		return max
+		return [uint8](max)
 	else 
 		return d
 	end
-end
-
-terra backToImage(data: &uint8, channels: int, width: int, height: int, Rout: &uint8, Gout: &uint8, Bout: &uint8)
-  if (channels == 3) then
-    for j=0,(width * height) do
-      data[3*j], data[(3*j)+1], data[(3*j)+2] = Rout[j], Gout[j], Bout[j]
-    end
-  end
-end
-
-terra min(a : int, b : int)
-  return terralib.select(a < b, a, b)
 end
 
 -- N to images, M to kernel
@@ -139,16 +130,28 @@ function blockedloop(N,M,blocksizes,bodyfn)
     return generatelevel(1,0,0,0,0,N,N,M,M)
 end
 
-function naiveconvolution() 
-  var iRows, var iCols = self.width, self.height 
+terra backToImage(data: &uint8, channels: int, width: int, height: int, Rout: &double, Gout: &double, Bout: &double)
+  if (channels == 3) then
+    for j=0,(width * height) do
+      data[3*j], data[(3*j)+1], data[(3*j)+2] = bound(Rout[j],255), bound(Gout[j],255), bound(Bout[j],255)
+    end
+  end
+end
+
+terra min(a : int, b : int)
+  return terralib.select(a < b, a, b)
+end
+
+terra Image:naiveconv(ker: Filter)
+  var iRows, iCols = self.width, self.height 
   var kRows, kCols = ker.width, ker.height
   var channels = self.channels
   var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
   var weights: &double = ker.weights
   var data: &uint8 = [&uint8](self.dataPtr)
   var r: &uint8, g: &uint8, b: &uint8 = generateRGB(self.width,self.height,data)
-  var Rout: &uint8, Gout: &uint8, Bout: &uint8 = memRGB(self.width,self.height)
-  var img : &uint8, out : &uint8
+  var Rout: &double, Gout: &double, Bout: &double = memDoubleRGB(self.width,self.height)
+  var img : &uint8, out : &double
 
   for p=0,channels do
     if p == 0 then
@@ -168,8 +171,8 @@ function naiveconvolution()
         for m=0, kRows do
           for n=0,kCols do
             -- boundaries
-            ii = i + (m - kCenterY)
-            jj = j + (n - kCenterX)
+            var ii: int = i + (m - kCenterY)
+            var jj: int = j + (n - kCenterX)
             if ii>=0 and ii<iRows and jj>=0 and jj<iCols then
               out[i*iCols + j] = out[i*iCols + j] + [double]([double](img[ii * iCols + jj]) * weights[m * kCols + n])
             end
@@ -178,9 +181,8 @@ function naiveconvolution()
       end
     end
   end
-
   backToImage(data,channels,self.width,self.height,Rout,Gout,Bout)
-  free(r,b,g,Rout,Gout,Bout)
+  free(r,g,b,Rout,Gout,Bout)
 end
 
 terra Image:convolve(ker: Filter)
@@ -192,12 +194,14 @@ terra Image:convolve(ker: Filter)
   var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
   var weights: &double = ker.weights
   var data: &uint8 = [&uint8](self.dataPtr)
+
   -- check arguments
   -- if self.dataPtr ~= self.data then cstdio.printf("STRIDED IMAGE")  end 
   --cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d \n",iRows, iCols, channels, kRows, kCols, kCenterX, kCenterY)
+
   var r: &uint8, g: &uint8, b: &uint8 = generateRGB(self.width,self.height,data)
-  var img : &uint8, out : &uint8
-  var Rout: &uint8, Gout: &uint8, Bout: &uint8 = memRGB(self.width,self.height)
+  var img : &uint8, out : &double
+  var Rout: &double, Gout: &double, Bout: &double = memDoubleRGB(self.width,self.height)
 
   --ker:print()
 
@@ -214,21 +218,22 @@ terra Image:convolve(ker: Filter)
       out = Bout
     end
     
-    -- for j=0,(iRows * iCols) do cstdio.printf(" %d ", img[j])  end 
     var x: int, y: int
     var N: int, M: int = self.width, ker.width
+
     --todo: convolution dividing by ker.divisor in the final
-    [blockedloop(N, M, {1,2,3}, function(i,j,ki,kj)
+     [blockedloop(N, M, {1,2,3}, function(i,j,ki,kj)
       return
         quote
           -- IO.printf("%d %d %d %d\n",i,j,ki,kj)
           x, y = i + (ki - kCenterY), j + (kj - kCenterX)
           if x >= 0 and x<iRows and y>=0 and y<iCols then
-            out[i * iCols + j] = out[i * iCols + j] + img[x * iCols + y] * weights[ki * kCols + kj];
+            out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
           end
         end
       end)
     ]
+
   end
   backToImage(data,channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)
@@ -243,7 +248,7 @@ terra Filter:load()
   cstdio.scanf("%d%*c",&height)
   cstdio.scanf("%d%*c",&divisor)
   for i=0,25 do
-    cstdio.scanf("%d%*c",&weights[i])
+    cstdio.scanf("%lf%*c",&weights[i])
   end
   return self:init(width,height,width,divisor,false,weights)
 end
@@ -261,6 +266,8 @@ local terra loadAndRun(argc: int, argv: &rawstring)
   -- convolve
   ker:flip()
   inp:convolve(ker)
+
+  --inp:convolve(ker)
 
   -- print(runBenchmark(testing))
 

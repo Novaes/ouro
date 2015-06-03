@@ -51,7 +51,7 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
 			--alpha C mult, load C to fast memory (register vector), multiply it by alpha
-			loadc:insert(quote
+			loadc:insert(quote	
 				var [caddr[m][n]] = C + m*ldc + n*V
 				var [c[m][n]] = alpha * unalignedload(VP([caddr[m][n]]))
 			end)
@@ -122,9 +122,9 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
                    for j = jj,min(jj+bb1,M),blocksize do
                       for k = kk,min(kk+bb2,K),blocksize do
                         [ generatelevel(n+1,i,j,k,blocksize,blocksize,blocksize) ]
-           end end end end
-  end
-  return generatelevel(1,0,0,0,N,M,K)
+           end end end end 
+    end
+  return generatelevel(1,0,0,0,N,M,K) 
 end
 
 function generatedgemm(NB,NBF, RM,RN ,V)
@@ -148,7 +148,6 @@ function generatedgemm(NB,NBF, RM,RN ,V)
 									if isboundary then
 										--IO.printf("b0 %d %d %d\n",MM,NN,KK)
 										l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
-
 										--IO.printf("be %d %d %d\n",MM,NN,KK)
 									else
 										l1dgemm0(AA,BB,CC,lda,ldb,ldc)

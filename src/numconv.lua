@@ -3,24 +3,24 @@ terra min(a : int, b : int)
 end
 
 function blockedloop(N,blocksizes,bodyfn)
-    local function generatelevel(n,ii,jj,kk,ll,bb)
+    local function generatelevel(n,ii,jj,kk,ll,bb0,bb1,bb2,bb3)
         if n > #blocksizes then
           return bodyfn(ii,jj,kk,ll)
         end
         local blocksize = blocksizes[n]
         return quote
-            for i = ii,min(ii+bb,N),blocksize do
-                for j = jj,min(jj+bb,N),blocksize do
-                    for k = kk,min(kk+bb,N),blocksize do
-                        for l = ll,min(ll+bb,N),blocksize do
-                            [ generatelevel(n+1,i,j,k,l,blocksize) ]
+            for i = ii,min(ii+bb0,N),blocksize do
+                for j = jj,min(jj+bb1,N),blocksize do
+                    for k = kk,min(kk+bb2,N),blocksize do
+                        for l = ll,min(ll+bb3,N),blocksize do
+                            [ generatelevel(n+1,i,j,k,l,blocksize,blocksize,blocksize,blocksize) ]
                         end
                     end
                 end
             end
         end
     end
-    return generatelevel(1,0,0,0,0,N)
+    return generatelevel(1,0,0,0,0,N,N,N,N)
 end
 
 IO = terralib.includec("stdio.h")
@@ -85,7 +85,7 @@ terra main()
 	var kCenterY: int = 1
 
 	--change this N later
-	[blockedloop(N, {1, 2, 4}, function(i,j,ki,kj)
+	[blockedloop(N, {1, 2}, function(i,j,ki,kj)
 		return
 			quote
 				-- IO.printf("%d %d %d %d\n",i,j,ki,kj)
@@ -94,7 +94,7 @@ terra main()
                 	out[i][j] = out[i][j] + img[x][y] * ker[ki][kj];
               	end
 			end
-		end)
+		end):printpretty()
 	]
 
 	--display

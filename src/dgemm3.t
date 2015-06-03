@@ -8,7 +8,6 @@ function symmat(name,I,...)
 	return r
 end
 
-
 local function isinteger(x) return math.floor(x) == x end
 
 llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
@@ -35,7 +34,7 @@ function genkernel(NB, RM, RN, V,alpha,boundary)
 	local lda,ldb,ldc = symbol("lda"),symbol("ldb"),symbol("ldc")
 	local a,b,c,caddr = symmat("a",RM), symmat("b",RN), symmat("c",RM,RN), symmat("caddr",RM,RN)
 	local k = symbol("k")
-	
+
 	local loadc,storec = terralib.newlist(),terralib.newlist()
 	local VT = vector(double,V)
 	local VP = &VT

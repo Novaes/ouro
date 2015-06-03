@@ -23,8 +23,6 @@ void cblas_dgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA
 // ldb is the stride of matrix B (normally its N, ...)
 // ldc is the stride of the output matrix (normally it is N, ...)
 
-
-
 void asserteq(double * A, double * B, int M, int N) {
 	int i = 0;
 	for(int m = 0; m < M; m++) {
@@ -51,7 +49,6 @@ printerr:
 	}
 	assert(false);
 }
-
 
 /*  
 void naive_dgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA,
@@ -182,6 +179,7 @@ int main() {
 		int k = i;
 		testsize(m,n,k);
 		if(m*n+ m*k+n*k > 3*2048*2048) //usually max img resolution
+				//A and B are suppose to be at max by dgemm: 1024x1024 x 3, so 2 x 1024x1024
 			break;
 	}
 	//testsize(5000,5000,5000);
