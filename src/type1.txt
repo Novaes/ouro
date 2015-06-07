@@ -1,0 +1,45 @@
+dgemm.lua:102:          anon (dgemm.lua:102) = terra($A : &double,$B : &double,$C : &double,$lda : int32,$ldb : int32,$ldc : int32,$alpha : double) : {}
+dgemm.lua:104:              for $mn : int32 = 1,48 - 2,3 do
+dgemm.lua:105:                  for $nn : int32 = 1,48 - 2,2 do
+dgemm.lua:58:                       var $a00 : vector(double,1) = vecload($A, ($mn + 0) * $lda + ($nn + 0))
+dgemm.lua:62:                       var $c00 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 0)
+dgemm.lua:58:                       var $a01 : vector(double,1) = vecload($A, ($mn + 0) * $lda + ($nn + 1))
+dgemm.lua:62:                       var $c01 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 1)
+dgemm.lua:58:                       var $a10 : vector(double,1) = vecload($A, ($mn + 1) * $lda + ($nn + 0))
+dgemm.lua:62:                       var $c10 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 0)
+dgemm.lua:58:                       var $a11 : vector(double,1) = vecload($A, ($mn + 1) * $lda + ($nn + 1))
+dgemm.lua:62:                       var $c11 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 1)
+dgemm.lua:58:                       var $a20 : vector(double,1) = vecload($A, ($mn + 2) * $lda + ($nn + 0))
+dgemm.lua:62:                       var $c20 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 0)
+dgemm.lua:58:                       var $a21 : vector(double,1) = vecload($A, ($mn + 2) * $lda + ($nn + 1))
+dgemm.lua:62:                       var $c21 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 1)
+dgemm.lua:79:                       var $b00 : vector(double,1) = vecload($B, 0 * $ldb + 0)
+                                    var $b01 : vector(double,1) = vecload($B, 0 * $ldb + 1)
+                                    var $b02 : vector(double,1) = vecload($B, 0 * $ldb + 2)
+                                    var $b10 : vector(double,1) = vecload($B, 1 * $ldb + 0)
+                                    var $b11 : vector(double,1) = vecload($B, 1 * $ldb + 1)
+                                    var $b12 : vector(double,1) = vecload($B, 1 * $ldb + 2)
+                                    var $b20 : vector(double,1) = vecload($B, 2 * $ldb + 0)
+                                    var $b21 : vector(double,1) = vecload($B, 2 * $ldb + 1)
+                                    var $b22 : vector(double,1) = vecload($B, 2 * $ldb + 2)
+dgemm.lua:66:                       r0x0b58ba28 = vecstore($C, ($mn + 0) * $ldc + $nn + 0, $c00)
+                                    r0x0b58db08 = vecstore($C, ($mn + 0) * $ldc + $nn + 1, $c01)
+                                    r0x0b58fc70 = vecstore($C, ($mn + 1) * $ldc + $nn + 0, $c10)
+                                    r0x0b591de0 = vecstore($C, ($mn + 1) * $ldc + $nn + 1, $c11)
+                                    r0x0b593f48 = vecstore($C, ($mn + 2) * $ldc + $nn + 0, $c20)
+                                    r0x0b5960d8 = vecstore($C, ($mn + 2) * $ldc + $nn + 1, $c21)
+dgemm.lua:105:                  end
+dgemm.lua:104:              end
+dgemm.lua:102:          end
+dgemm.lua:123: Errors reported during specialization.
+dgemm.lua:130: variable 'l1matmul' not found
+					l1matmul(A + m*lda + n,
+					       ^
+
+stack traceback:
+	[C]: in function 'error'
+	src/terralib.lua:481: in function 'finishandabortiferrors'
+	src/terralib.lua:2152: in function 'specialize'
+	src/terralib.lua:975: in function 'newfunctiondefinition'
+	src/terralib.lua:1105: in function 'defineobjects'
+	dgemm.lua:123: in main chunk

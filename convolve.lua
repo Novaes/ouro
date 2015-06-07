@@ -108,8 +108,8 @@ terra bound(d: double, max: int) : uint8
 	end
 end
 
--- N to images, M to kernel
-function blockedloop(N,M,blocksizes,bodyfn)
+-- N, M to image, H, K to kernel
+function blockedloop(N,M,H,K,blocksizes,bodyfn)
     local function generatelevel(n,ii,jj,kk,ll,bb0,bb1,bb2,bb3)
         if n > #blocksizes then
          return bodyfn(ii,jj,kk,ll)
@@ -117,9 +117,9 @@ function blockedloop(N,M,blocksizes,bodyfn)
         local blocksize = blocksizes[n]
         return quote
             for i = ii,min(ii+bb0,N),blocksize do
-                for j = jj,min(jj+bb1,N),blocksize do
-                    for k = kk,min(kk+bb2,M),blocksize do
-                        for l = ll,min(ll+bb3,M),blocksize do
+                for j = jj,min(jj+bb1,M),blocksize do
+                    for k = kk,min(kk+bb2,H),blocksize do
+                        for l = ll,min(ll+bb3,K),blocksize do
                             [ generatelevel(n+1,i,j,k,l,blocksize,blocksize,blocksize,blocksize) ]
                         end
                     end
@@ -127,7 +127,7 @@ function blockedloop(N,M,blocksizes,bodyfn)
             end
         end
     end
-    return generatelevel(1,0,0,0,0,N,N,M,M)
+    return generatelevel(1,0,0,0,0,N,M,H,K)
 end
 
 terra backToImage(data: &uint8, channels: int, width: int, height: int, Rout: &double, Gout: &double, Bout: &double)
@@ -143,7 +143,7 @@ terra min(a : int, b : int)
 end
 
 terra Image:naiveconv(ker: Filter)
-  var iRows, iCols = self.width, self.height 
+  var iRows, iCols = self.width, self.height
   var kRows, kCols = ker.width, ker.height
   var channels = self.channels
   var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
@@ -165,7 +165,6 @@ terra Image:naiveconv(ker: Filter)
       out = Bout
     end
     var x: int, y: int
-    var N: int, M: int = self.width, ker.width
     for i=0, iRows do
       for j=0, iCols do
         for m=0, kRows do
@@ -188,7 +187,6 @@ end
 terra Image:convolve(ker: Filter)
   var iRows = self.width
   var iCols = self.height
-  var channels = self.channels
   var kRows = ker.width
   var kCols = ker.height
   var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
@@ -197,7 +195,7 @@ terra Image:convolve(ker: Filter)
 
   -- check arguments
   -- if self.dataPtr ~= self.data then cstdio.printf("STRIDED IMAGE")  end 
-  --cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d \n",iRows, iCols, channels, kRows, kCols, kCenterX, kCenterY)
+  --cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d \n",iRows, iCols, self.channels, kRows, kCols, kCenterX, kCenterY)
 
   var r: &uint8, g: &uint8, b: &uint8 = generateRGB(self.width,self.height,data)
   var img : &uint8, out : &double
@@ -205,7 +203,7 @@ terra Image:convolve(ker: Filter)
 
   --ker:print()
 
-  for p=0,channels do
+  for p=0,self.channels do
     if p == 0 then
       img = r
       out = Rout
@@ -217,12 +215,11 @@ terra Image:convolve(ker: Filter)
       img = b
       out = Bout
     end
-    
+
     var x: int, y: int
-    var N: int, M: int = self.width, ker.width
 
     --todo: convolution dividing by ker.divisor in the final
-     [blockedloop(N, M, {1,2,3}, function(i,j,ki,kj)
+     [blockedloop(iRows, iCols, kRows, kCols, {1,2,3}, function(i,j,ki,kj)
       return
         quote
           -- IO.printf("%d %d %d %d\n",i,j,ki,kj)
@@ -231,11 +228,9 @@ terra Image:convolve(ker: Filter)
             out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
           end
         end
-      end)
-    ]
-
+      end):printpretty()]
   end
-  backToImage(data,channels,self.width,self.height,Rout,Gout,Bout)
+  backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)
 end
 

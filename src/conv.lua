@@ -97,7 +97,7 @@ function check()
 end
 
 
-local function autotune()
+local function blocking()
   --get image, decompose on RGB, do the convolution operation
   local kernel = getKernel()
   local image = getImage()
@@ -113,6 +113,7 @@ local function autotune()
   local before = terralib.currenttimeinseconds()
   
   local time
+  
   io.write("Parameters: \n")
   for _,rm in ipairs(blockM) do
     for _,rn in ipairs(blockN) do
@@ -223,4 +224,4 @@ terra printl()
 end
 
 --printl()
-autotune()
+blocking()

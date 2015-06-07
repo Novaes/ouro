@@ -1,0 +1,110 @@
+gemm.lua:85:            anon (gemm.lua:85) = terra($A : &double,$B : &double,$C : &double,$lda : int64,$ldb : int64,$ldc : int64) : {}
+gemm.lua:86:                for $mn : int32 = 0,40,4 do
+gemm.lua:87:                    for $nn : int32 = 0,40,2 * 4 do
+gemm.lua:55:                        var $caddr00 : &double = $C + [int64](0) * $ldc + 0 * 4
+gemm.lua:56:                        var $c00 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr00), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr01 : &double = $C + [int64](0) * $ldc + 1 * 4
+gemm.lua:56:                        var $c01 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr01), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr10 : &double = $C + [int64](1) * $ldc + 0 * 4
+gemm.lua:56:                        var $c10 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr10), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr11 : &double = $C + [int64](1) * $ldc + 1 * 4
+gemm.lua:56:                        var $c11 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr11), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr20 : &double = $C + [int64](2) * $ldc + 0 * 4
+gemm.lua:56:                        var $c20 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr20), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr21 : &double = $C + [int64](2) * $ldc + 1 * 4
+gemm.lua:56:                        var $c21 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr21), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr30 : &double = $C + [int64](3) * $ldc + 0 * 4
+gemm.lua:56:                        var $c30 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr30), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:55:                        var $caddr31 : &double = $C + [int64](3) * $ldc + 1 * 4
+gemm.lua:56:                        var $c31 : vector(double,4) = [vector(double,4)]([double](0)) * 
+gemm.lua:19:                                                                                        attrload(
+gemm.lua:56:                                                                                                 [&vector(double,4)]($caddr31), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:89:                        for $k : int32 = 0,40 do
+gemm.lua:90:                            r0x0e557540 = llvm.prefetch([&opaque]($B + [int64](4) * $ldb), 0, 3, 1)
+gemm.lua:69:                            var $b0 : vector(double,4) = 
+gemm.lua:19:                                                         attrload(
+gemm.lua:69:                                                                  [&vector(double,4)](&$B[0 * 4]), { nontemporal = false, align = native, isvolatile = false })
+                                        var $b1 : vector(double,4) = 
+gemm.lua:19:                                                         attrload(
+gemm.lua:69:                                                                  [&vector(double,4)](&$B[1 * 4]), { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:74:                            var $a0 : vector(double,4) = [vector(double,4)]($A[[int64](0) * $lda])
+                                        var $a1 : vector(double,4) = [vector(double,4)]($A[[int64](1) * $lda])
+                                        var $a2 : vector(double,4) = [vector(double,4)]($A[[int64](2) * $lda])
+                                        var $a3 : vector(double,4) = [vector(double,4)]($A[[int64](3) * $lda])
+gemm.lua:80:                            $c00 = $c00 + $a0 * $b0
+                                        $c01 = $c01 + $a0 * $b1
+                                        $c10 = $c10 + $a1 * $b0
+                                        $c11 = $c11 + $a1 * $b1
+                                        $c20 = $c20 + $a2 * $b0
+                                        $c21 = $c21 + $a2 * $b1
+                                        $c30 = $c30 + $a3 * $b0
+                                        $c31 = $c31 + $a3 * $b1
+gemm.lua:92:                            $B = $B + $ldb
+gemm.lua:93:                            $A = $A + 1
+gemm.lua:89:                        end
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr00), $c00, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr01), $c01, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr10), $c10, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr11), $c11, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr20), $c20, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr21), $c21, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr30), $c30, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:22:                        attrstore(
+gemm.lua:60:                                  [&vector(double,4)]($caddr31), $c31, { nontemporal = false, align = native, isvolatile = false })
+gemm.lua:96:                        $A = $A - 40
+gemm.lua:97:                        $B = $B - ($ldb * [int64](40)) + 2 * 4
+gemm.lua:98:                        $C = $C + 2 * 4
+gemm.lua:87:                    end
+gemm.lua:100:                   $C = ($C + [int64](4) * $ldb) - 40
+gemm.lua:101:                   $B = $B - 40
+gemm.lua:102:                   $A = $A + $lda * [int64](4)
+gemm.lua:86:                end
+gemm.lua:85:            end
+gemm.lua:218: Errors reported during specialization.
+gemm.lua:143: error evaluating lua code: 
+		[ blockedloop(N,M,K,{NB2,NB},function(m,n,k) return quote
+		            ^
+lua error was:
+gemm.lua:121: Errors reported during specialization.
+gemm.lua:124: error evaluating lua code: 
+                        [ generatelevel(n+1,i,j,k,blocksize,blocksize,blocksize) ]
+                                      ^
+lua error was:
+gemm.lua:121: Errors reported during specialization.
+gemm.lua:124: error evaluating lua code: 
+                        [ generatelevel(n+1,i,j,k,blocksize,blocksize,blocksize) ]
+                                      ^
+lua error was:
+ Errors reported during specialization.
+gemm.lua:153: variable 'l1dgemm0' not found
+										l1dgemm0(AA,BB,CC,lda,ldb,ldc)
+										       ^
+
+stack traceback:
+	[C]: in function 'error'
+	src/terralib.lua:481: in function 'finishandabortiferrors'
+	src/terralib.lua:2152: in function 'specialize'
+	src/terralib.lua:975: in function 'newfunctiondefinition'
+	src/terralib.lua:1120: in function 'generatedgemm'
+	gemm.lua:218: in main chunk
