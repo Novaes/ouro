@@ -35,25 +35,50 @@ local MTH = {}
 -- 	--acc.cblas_dgemm(101,111,111,M,N,K,1.0,A,K,B,N,0.0,C,N)
 -- end
 
+function printMatrix(m,rows,columns)
+  local matrix = m
+  for i=0,rows-1 do
+    for j=0,columns-1 do
+      io.write(" " .. matrix[i*columns + j])
+    end
+    io.write("\n")
+  end
+  io.write("\n")
+end
+
 function MTH.timefunctions(typstring,M,N,K,L,...)
+
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
-	local A,B = ffi.new(ctyp,M*N), ffi.new(ctyp,K*L)
+	local A = ffi.new(ctyp,M*N) 
+	local B = ffi.new(ctyp,K*L)
+
+	--simple example
 	for m = 0, M-1 do
 		for n = 0, N-1 do
-			A[m*N + n] = math.random(0,9)
+			if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
+				A[m*N + n] = 0
+			else
+				A[m*N + n] = (m-1)*(N-2) + n
+			end
 		end
 	end
 
-	-- B[0] = 1; B[1] = 2; B[2] = 1;
- 	-- B[3] = 0; B[4] = 0; B[5] = 0;
- 	-- B[6] = -1;B[7] =-2; B[8] = -1;
+	B[0] = 1; B[1] = 2; B[2] = 1;
+	B[3] = 0; B[4] = 0; B[5] = 0;
+	B[6] = -1;B[7] =-2; B[8] = -1;
 
-    -- random filters
-	for k = 0, K-1 do
-		for l = 0, L-1 do
-			B[k*L + l] = math.random(0,9)
-		end
-	end
+	-- randomizing
+	-- for m = 0, M-1 do
+	-- 	for n = 0, N-1 do
+	-- 		A[m*N + n] = math.random(0,9)
+	-- 	end
+	-- end
+
+	-- for k = 0, K-1 do
+	-- 	for l = 0, L-1 do
+	-- 		B[k*L + l] = math.random(0,9)
+	-- 	end
+	-- end
 
 	local fns = {...}
 	local Cs = {}
@@ -62,11 +87,18 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	for i,fn in ipairs(fns) do
 		local C = ffi.new(ctyp,M*N)
 		for j = 0, M * N - 1 do 
-			C[j] = -1
+			C[j] = 0
+		 -- C[j] = -1 -- for DGEMM
 		end	
 		Cs[i] = C
 	end
-	
+
+	-- local C = ffi.new(ctyp,M*N)
+	-- for j = 0, M * N - 1 do 
+	-- 	C[j] = 0
+	-- end	
+
+
 	-- compute 
 	local results = {}
 	for i,fn in ipairs(fns) do
@@ -74,6 +106,9 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local tocall = function() fn(M,N,K,L,A,B,C) end
 		tocall()
 		CalcTime(tocall) -- execution time
+		-- printMatrix(A,M,N)
+		-- printMatrix(B,K,L)
+		-- printMatrix(C,M,N)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then
 			local C0 = Cs[1]
@@ -93,7 +128,6 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 end
 
 function MTH.comparetoaccelerate(NB,myfn)
-
 	for i = NB, math.huge, NB do
 		local m,n,k = i,i,i
 		io.write(("%d %d %d "):format(m,n,k))

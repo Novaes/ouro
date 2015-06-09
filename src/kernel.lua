@@ -19,14 +19,26 @@ function symmat(name,I,...)
 	return r
 end
 
+function printMatrix(m,rows,columns)
+  local matrix = m
+  for i=0,rows-1 do
+    for j=0,columns-1 do
+      io.write(" " .. matrix[i*columns + j])
+    end
+    io.write("\n")
+  end
+  io.write("\n")
+end
+
 -- generate L1 convolution 
 function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- assert: no boundary cases
 	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
 	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
-
+	
+	print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
+	
 	local M,N = NB,NB -- new
-
 	local VP = &vector(double,V)
 	local terra vecload(data : &double, idx : int)
 		var addr = &data[idx]
@@ -48,17 +60,15 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	for m = 0, RM+1 do 
 		for n = 0, RN+1 do
 			loadA:insert(quote
-				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n) -- mm+1 and nn+1 because I start from -1 now 
+				-- mm+1 and nn+1 because I start from -1 now 
+				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n) 
 				end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
 					var [c[m][n]] = alpha * vecload(C,(mm+m)*ldc + nn + n)
-					-- var [c[m][n]] = alpha * @(C + (mm+m)*ldc + nn + n)
 					end)
 				storec:insert(quote
 					vecstore(C,(mm+m)*ldc + nn + n,[c[m][n]])
-					-- var c: &double = C + (mm+m)*ldc + nn + n
-					-- c =  [c[m][n]]
 					end)
 			end
 		end
@@ -85,13 +95,14 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 					--if x >= -1 and x<RM+1 and y>=-1 and y<RN+1 then --RM+1 and RN+1 are the image loads, no boundaries cases
 					calcc:insert(quote
 						--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
-						[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[l][k]]
+						[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
 					end)
 				end
 			end
 		end
 	end
 
+	-- optimization point
 	return terra([A] : &double, [B] : &double, [C] : &double, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		-- no borders, original from 0 to NB-1
 		for [mm] = 1, NB-2, RM do
@@ -115,20 +126,22 @@ function genconvolution(NB,NBF,RM,RN,V)
 		return false
 	end
 
-	-- 5 times NB minimum by dgemm
+	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
 	local NB2 = NB
-	local l1matmul = genkernel(NB, 3, 2, 1, false, 3, 3)
+
+	-- EXAMPLES
+	--local l1matmul = genkernel(NB, 3, 2, 1, false, 3, 3) 
+	local l1matmul = genkernel(NB, 3, 3, 1, false, 3, 3)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
-		-- use blocking on this loop 
+		-- use blocking on this loop
 		for mm = 0,M,NB2 do
 			for nn = 0,N,NB2 do
 				for m = mm,min(mm+NB2,M),NB do
 					for n = nn,min(nn+NB2,N),NB do
-
 						l1matmul(A + m*lda + n,
 						         B, -- B, fixed kernel
 						         C + m*ldc + n,
@@ -170,7 +183,7 @@ if dotune then
 						local i = math.floor(tunefor / b) * b
 						local curr_gflops = 0
 						local ctyp
-						local correct, exectimes = harness.timefunctions(tostring(number),i,i,i,i, function(M,N,K,L,A,B,C)   
+						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)   
                         		my_conv(nil,M,N,K,L,1.0,A,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2 
 						end)
 						if not correct then	print("<error>")  break  end

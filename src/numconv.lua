@@ -173,18 +173,18 @@ terra conv2d()
 	end
 -- ======================================================================
 	
-	--borders??
-		--vertical
-		for i=0,N do
-			for j=0,N do
-				out1[0][i] = out1[0][i] + img[j][i] * ker1[j][0]
-			end
+--borders??
+	--vertical
+	for i=0,N do
+		for j=0,N do
+			out1[0][i] = out1[0][i] + img[j][i] * ker1[j][0]
 		end
-		var v: int = 0
-		--horizontal
-		for i=0,N do
-			v = v + out1[0][i] * ker2[0][i]
-		end
+	end
+	var v: int = 0
+	--horizontal
+	for i=0,N do
+		v = v + out1[0][i] * ker2[0][i]
+	end
 		
 	-- for i=0,N do
 	-- 	IO.printf("%d ",out1[i][0])

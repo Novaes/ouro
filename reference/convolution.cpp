@@ -93,8 +93,8 @@ void testsize(int M, int N, int K, int L) {
     B[3] = 0; B[4] = 0; B[5] = 0;
     B[6] = -1;B[7] = -2;B[8] = -1;
 
-     double mytime;
-     int times = 0;
+    double mytime;
+    int times = 0;
 
     while(CalcTime(&times,&mytime))
         my_dgemm(CurrentTimeInSeconds,M,N,K,L,1.f,A,N,B,L,C,N,K/2,L/2);
@@ -105,7 +105,7 @@ void testsize(int M, int N, int K, int L) {
     C2[6] = 13;  C2[7] = 20;  C2[8] = 17;
     //asserteq(C,C2,M,N);
 
-    for(int m = 0; m < M; m++) {
+    for(int m = 0; m < M; m++){
         for(int n = 0; n < N; n++) {
             printf("%f ", C[m*N + n]);
         }

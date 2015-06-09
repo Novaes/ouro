@@ -234,6 +234,56 @@ terra Image:convolve(ker: Filter)
   free(r,b,g,Rout,Gout,Bout)
 end
 
+terra Image:convolutiontuned(ker: Filter)
+  var iRows = self.width
+  var iCols = self.height
+  var kRows = ker.width
+  var kCols = ker.height
+  var kCenterX : int, kCenterY: int = cmath.floor(kRows/2), cmath.floor(kCols/2)
+  var weights: &double = ker.weights
+  var data: &uint8 = [&uint8](self.dataPtr)
+
+  -- check arguments
+  -- if self.dataPtr ~= self.data then cstdio.printf("STRIDED IMAGE")  end 
+  --cstdio.printf("basic data") cstdio.printf("%d %d %d %d %d %d %d \n",iRows, iCols, self.channels, kRows, kCols, kCenterX, kCenterY)
+
+  var r: &uint8, g: &uint8, b: &uint8 = generateRGB(self.width,self.height,data)
+  var img : &uint8, out : &double
+  var Rout: &double, Gout: &double, Bout: &double = memDoubleRGB(self.width,self.height)
+
+  --ker:print()
+
+  for p=0,self.channels do
+    if p == 0 then
+      img = r
+      out = Rout
+  --  for i=0,(kRows) do for j=0,(kCols) do cstdio.printf("%d ", out[i*kCols + j])  end cstdio.printf("\n") end 
+    elseif p == 1 then
+      img = g
+      out = Gout
+    else 
+      img = b
+      out = Bout
+    end
+
+    var x: int, y: int
+
+    --todo: convolution dividing by ker.divisor in the final
+     [blockedloop(iRows, iCols, kRows, kCols, {1,2,3}, function(i,j,ki,kj)
+      return
+        quote
+          -- IO.printf("%d %d %d %d\n",i,j,ki,kj)
+          x, y = i + (ki - kCenterY), j + (kj - kCenterX)
+          if x >= 0 and x<iRows and y>=0 and y<iCols then
+            out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
+          end
+        end
+      end):printpretty()]
+  end
+  backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
+  free(r,b,g,Rout,Gout,Bout)
+end
+
 terra Filter:load()
   var width : int
   var height: int
