@@ -1,7 +1,7 @@
 local number = double
 local alignment = 8
 
-local dotune = true
+local dotune = false
 
 function symmat(name,I,...)
 	if not I then return symbol(name) end
@@ -133,7 +133,7 @@ function generatedgemm(NB,NBF, RM,RN ,V)
 	end
 
 	local NB2 = NBF * NB
-	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false)
+	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false):printpretty()
 	local l1dgemm1 = genkernel(NB,RM,RN,V,1,false)
 	local l1dgemm0b = genkernel(NB,1,1,1,0,true)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
@@ -176,7 +176,7 @@ local best = { gflops = 0, b = 40, rm = 4, rn = 2, v = 4 }
 
 if dotune then
 	local tunefor = 1024
-	local harness = require("lib/matrixtestharness")
+	local harness = require("lib/matrixtestharnessGEMM")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
@@ -205,6 +205,8 @@ if dotune then
 									terralib.tree.printraw(best)
 								end
 							end
+
+
 						end
 					--end
 				--end

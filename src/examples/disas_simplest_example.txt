@@ -1,0 +1,256 @@
+definition 	{&double,&double,&double,int32,int32,int32,double} -> {}
+assembly for function at address 0x5c1070
+0x5c1070(+0):		push	r15
+0x5c1072(+2):		push	r14
+0x5c1074(+4):		push	rbx
+0x5c1075(+5):		vmovsd	qword ptr [rsp - 8], xmm0
+0x5c107b(+11):		movsxd	rax, r8d
+0x5c107e(+14):		lea	ecx, dword ptr [rax + 1]
+0x5c1081(+17):		movsxd	r10, ecx
+0x5c1084(+20):		lea	ecx, dword ptr [rax + 2]
+0x5c1087(+23):		movsxd	r14, ecx
+0x5c108a(+26):		mov	ecx, eax
+0x5c108c(+28):		add	ecx, eax
+0x5c108e(+30):		movsxd	r11, ecx
+0x5c1091(+33):		lea	ecx, dword ptr [r8 + r8 + 1]
+0x5c1096(+38):		movsxd	r15, ecx
+0x5c1099(+41):		vmovsd	xmm5, qword ptr [rsi + 8*rax]
+0x5c109e(+46):		vmovsd	qword ptr [rsp - 120], xmm5
+0x5c10a4(+52):		lea	eax, dword ptr [r9 + r9]
+0x5c10a8(+56):		movsxd	rax, eax
+0x5c10ab(+59):		vmovsd	xmm10, qword ptr [rsi + 8*r10]
+0x5c10b1(+65):		vmovsd	qword ptr [rsp - 16], xmm10
+0x5c10b7(+71):		movsxd	rbx, r9d
+0x5c10ba(+74):		vmovsd	xmm1, qword ptr [rdi + 8]
+0x5c10bf(+79):		vmovsd	xmm15, qword ptr [rdi + 16]
+0x5c10c4(+84):		vmovsd	xmm3, qword ptr [rdi + 8*rbx]
+0x5c10c9(+89):		vmovsd	qword ptr [rsp - 88], xmm3
+0x5c10cf(+95):		vmovsd	xmm12, qword ptr [rsi + 8*r11]
+0x5c10d5(+101):		vmovsd	qword ptr [rsp - 40], xmm12
+0x5c10db(+107):		lea	ecx, dword ptr [rbx + 1]
+0x5c10de(+110):		movsxd	r10, ecx
+0x5c10e1(+113):		vmovsd	xmm7, qword ptr [rdi + 8*r10]
+0x5c10e7(+119):		vmovsd	xmm2, qword ptr [rsi + 8*r15]
+0x5c10ed(+125):		vmovsd	qword ptr [rsp - 48], xmm2
+0x5c10f3(+131):		lea	ecx, dword ptr [rbx + 2]
+0x5c10f6(+134):		movsxd	r11, ecx
+0x5c10f9(+137):		vmovsd	xmm9, qword ptr [rdi + 8*r11]
+0x5c10ff(+143):		vmovsd	qword ptr [rsp - 104], xmm9
+0x5c1105(+149):		vmovsd	xmm6, qword ptr [rdi + 8*rax]
+0x5c110a(+154):		vmovsd	qword ptr [rsp - 24], xmm6
+0x5c1110(+160):		vmulsd	xmm11, xmm0, qword ptr [rdx + 8*r10]
+0x5c1116(+166):		vmovsd	xmm13, qword ptr [rsi]
+0x5c111a(+170):		vmovsd	xmm0, qword ptr [rsi + 8]
+0x5c111f(+175):		vmovsd	qword ptr [rsp - 56], xmm0
+0x5c1125(+181):		vmovsd	xmm8, qword ptr [rsi + 16]
+0x5c112a(+186):		vmovsd	qword ptr [rsp - 128], xmm8
+0x5c1130(+192):		vmulsd	xmm4, xmm13, qword ptr [rdi]
+0x5c1134(+196):		vaddsd	xmm11, xmm11, xmm4
+0x5c1138(+200):		vmulsd	xmm4, xmm1, xmm5
+0x5c113c(+204):		vaddsd	xmm5, xmm11, xmm4
+0x5c1140(+208):		vmulsd	xmm4, xmm15, xmm12
+0x5c1145(+213):		vaddsd	xmm5, xmm5, xmm4
+0x5c1149(+217):		vmulsd	xmm4, xmm3, xmm0
+0x5c114d(+221):		vaddsd	xmm0, xmm4, xmm5
+0x5c1151(+225):		vmulsd	xmm4, xmm7, xmm10
+0x5c1156(+230):		vaddsd	xmm3, xmm4, xmm0
+0x5c115a(+234):		vmovaps	xmm5, xmm9
+0x5c115f(+239):		vmulsd	xmm4, xmm5, xmm2
+0x5c1163(+243):		vmovaps	xmm11, xmm2
+0x5c1167(+247):		vaddsd	xmm3, xmm4, xmm3
+0x5c116b(+251):		vmulsd	xmm4, xmm6, xmm8
+0x5c1170(+256):		vaddsd	xmm4, xmm4, xmm3
+0x5c1174(+260):		vmovsd	xmm10, qword ptr [rdi + 8*rax + 8]
+0x5c117a(+266):		vmovsd	xmm0, qword ptr [rsi + 8*r14]
+0x5c1180(+272):		vmovsd	qword ptr [rsp - 64], xmm0
+0x5c1186(+278):		vmulsd	xmm6, xmm10, xmm0
+0x5c118a(+282):		vaddsd	xmm0, xmm6, xmm4
+0x5c118e(+286):		lea	ecx, dword ptr [r9 + r9 + 2]
+0x5c1193(+291):		movsxd	r14, ecx
+0x5c1196(+294):		vmovsd	xmm9, qword ptr [rdi + 8*r14]
+0x5c119c(+300):		lea	ecx, dword ptr [r8 + r8 + 2]
+0x5c11a1(+305):		movsxd	rcx, ecx
+0x5c11a4(+308):		vmovsd	xmm2, qword ptr [rsi + 8*rcx]
+0x5c11a9(+313):		vmulsd	xmm14, xmm9, xmm2
+0x5c11ad(+317):		vmovaps	xmm6, xmm2
+0x5c11b1(+321):		vaddsd	xmm0, xmm14, xmm0
+0x5c11b5(+325):		vmovsd	qword ptr [rsp - 72], xmm0
+0x5c11bb(+331):		vmovsd	xmm3, qword ptr [rsp - 8]
+0x5c11c1(+337):		vmulsd	xmm0, xmm3, qword ptr [rdx + 8*r11]
+0x5c11c7(+343):		vmulsd	xmm1, xmm1, xmm13
+0x5c11cc(+348):		vaddsd	xmm0, xmm0, xmm1
+0x5c11d0(+352):		vmovsd	xmm2, qword ptr [rsp - 120]
+0x5c11d6(+358):		vmulsd	xmm1, xmm15, xmm2
+0x5c11da(+362):		vaddsd	xmm0, xmm0, xmm1
+0x5c11de(+366):		vmulsd	xmm1, xmm12, qword ptr [rdi + 24]
+0x5c11e3(+371):		vaddsd	xmm0, xmm0, xmm1
+0x5c11e7(+375):		vmovsd	xmm4, qword ptr [rsp - 56]
+0x5c11ed(+381):		vmulsd	xmm1, xmm7, xmm4
+0x5c11f1(+385):		vaddsd	xmm0, xmm1, xmm0
+0x5c11f5(+389):		vmovsd	xmm14, qword ptr [rsp - 16]
+0x5c11fb(+395):		vmulsd	xmm1, xmm5, xmm14
+0x5c1200(+400):		vaddsd	xmm15, xmm1, xmm0
+0x5c1204(+404):		add	ebx, 3
+0x5c1207(+407):		movsxd	rcx, ebx
+0x5c120a(+410):		vmovsd	xmm0, qword ptr [rdi + 8*rcx]
+0x5c120f(+415):		vmovsd	qword ptr [rsp - 96], xmm0
+0x5c1215(+421):		vmulsd	xmm1, xmm0, xmm11
+0x5c121a(+426):		vaddsd	xmm0, xmm1, xmm15
+0x5c121f(+431):		vmovaps	xmm15, xmm8
+0x5c1224(+436):		vmulsd	xmm1, xmm10, xmm15
+0x5c1229(+441):		vaddsd	xmm0, xmm1, xmm0
+0x5c122d(+445):		vmovsd	xmm5, qword ptr [rsp - 64]
+0x5c1233(+451):		vmulsd	xmm1, xmm9, xmm5
+0x5c1237(+455):		vaddsd	xmm8, xmm1, xmm0
+0x5c123b(+459):		lea	ecx, dword ptr [r9 + r9 + 3]
+0x5c1240(+464):		movsxd	rcx, ecx
+0x5c1243(+467):		vmovsd	xmm0, qword ptr [rdi + 8*rcx]
+0x5c1248(+472):		vmovsd	qword ptr [rsp - 32], xmm0
+0x5c124e(+478):		vmulsd	xmm1, xmm0, xmm6
+0x5c1252(+482):		vmovaps	xmm11, xmm6
+0x5c1256(+486):		vaddsd	xmm0, xmm1, xmm8
+0x5c125b(+491):		vmovsd	qword ptr [rsp - 80], xmm0
+0x5c1261(+497):		vmulsd	xmm0, xmm3, qword ptr [rdx + 8*rax + 8]
+0x5c1267(+503):		vmovsd	xmm1, qword ptr [rsp - 88]
+0x5c126d(+509):		vmulsd	xmm1, xmm1, xmm13
+0x5c1272(+514):		vaddsd	xmm0, xmm0, xmm1
+0x5c1276(+518):		vmulsd	xmm1, xmm7, xmm2
+0x5c127a(+522):		vmovaps	xmm3, xmm2
+0x5c127e(+526):		vaddsd	xmm0, xmm0, xmm1
+0x5c1282(+530):		vmovsd	xmm2, qword ptr [rsp - 104]
+0x5c1288(+536):		vmulsd	xmm1, xmm2, xmm12
+0x5c128d(+541):		vaddsd	xmm0, xmm0, xmm1
+0x5c1291(+545):		vmovsd	xmm1, qword ptr [rsp - 24]
+0x5c1297(+551):		vmulsd	xmm1, xmm1, xmm4
+0x5c129b(+555):		vmovaps	xmm12, xmm4
+0x5c129f(+559):		vaddsd	xmm0, xmm1, xmm0
+0x5c12a3(+563):		vmulsd	xmm1, xmm10, xmm14
+0x5c12a8(+568):		vaddsd	xmm0, xmm1, xmm0
+0x5c12ac(+572):		vmovsd	xmm6, qword ptr [rsp - 48]
+0x5c12b2(+578):		vmulsd	xmm1, xmm9, xmm6
+0x5c12b6(+582):		vaddsd	xmm0, xmm1, xmm0
+0x5c12ba(+586):		lea	ecx, dword ptr [r9 + 2*r9]
+0x5c12be(+590):		movsxd	rcx, ecx
+0x5c12c1(+593):		vmovsd	xmm1, qword ptr [rdi + 8*rcx]
+0x5c12c6(+598):		vmovsd	qword ptr [rsp - 112], xmm1
+0x5c12cc(+604):		vmulsd	xmm1, xmm1, xmm15
+0x5c12d1(+609):		vaddsd	xmm0, xmm1, xmm0
+0x5c12d5(+613):		lea	ecx, dword ptr [r9 + 2*r9 + 1]
+0x5c12da(+618):		movsxd	rsi, ecx
+0x5c12dd(+621):		vmovsd	xmm8, qword ptr [rdi + 8*rsi]
+0x5c12e2(+626):		vmulsd	xmm14, xmm8, xmm5
+0x5c12e6(+630):		vmovaps	xmm4, xmm5
+0x5c12ea(+634):		vaddsd	xmm0, xmm14, xmm0
+0x5c12ee(+638):		lea	ecx, dword ptr [r9 + 2*r9 + 2]
+0x5c12f3(+643):		movsxd	rbx, ecx
+0x5c12f6(+646):		vmovsd	xmm14, qword ptr [rdi + 8*rbx]
+0x5c12fb(+651):		vmulsd	xmm15, xmm14, xmm11
+0x5c1300(+656):		vaddsd	xmm0, xmm15, xmm0
+0x5c1304(+660):		vmovsd	qword ptr [rsp - 88], xmm0
+0x5c130a(+666):		vmovsd	xmm15, qword ptr [rsp - 8]
+0x5c1310(+672):		vmulsd	xmm0, xmm15, qword ptr [rdx + 8*r14]
+0x5c1316(+678):		vmulsd	xmm7, xmm7, xmm13
+0x5c131b(+683):		vaddsd	xmm0, xmm0, xmm7
+0x5c131f(+687):		vmovaps	xmm1, xmm3
+0x5c1323(+691):		vmulsd	xmm5, xmm2, xmm1
+0x5c1327(+695):		vaddsd	xmm0, xmm0, xmm5
+0x5c132b(+699):		vmovsd	xmm3, qword ptr [rsp - 40]
+0x5c1331(+705):		vmovsd	xmm2, qword ptr [rsp - 96]
+0x5c1337(+711):		vmulsd	xmm5, xmm2, xmm3
+0x5c133b(+715):		vaddsd	xmm0, xmm0, xmm5
+0x5c133f(+719):		vmovaps	xmm2, xmm12
+0x5c1344(+724):		vmulsd	xmm5, xmm10, xmm2
+0x5c1348(+728):		vaddsd	xmm0, xmm5, xmm0
+0x5c134c(+732):		vmovsd	xmm7, qword ptr [rsp - 16]
+0x5c1352(+738):		vmulsd	xmm5, xmm9, xmm7
+0x5c1356(+742):		vaddsd	xmm0, xmm5, xmm0
+0x5c135a(+746):		vmovsd	xmm5, qword ptr [rsp - 32]
+0x5c1360(+752):		vmulsd	xmm5, xmm5, xmm6
+0x5c1364(+756):		vaddsd	xmm0, xmm5, xmm0
+0x5c1368(+760):		vmovsd	xmm12, qword ptr [rsp - 128]
+0x5c136e(+766):		vmulsd	xmm5, xmm8, xmm12
+0x5c1373(+771):		vaddsd	xmm0, xmm5, xmm0
+0x5c1377(+775):		vmulsd	xmm5, xmm14, xmm4
+0x5c137b(+779):		vaddsd	xmm4, xmm5, xmm0
+0x5c137f(+783):		lea	ecx, dword ptr [r9 + 2*r9 + 3]
+0x5c1384(+788):		movsxd	rcx, ecx
+0x5c1387(+791):		vmovsd	xmm0, qword ptr [rdi + 8*rcx]
+0x5c138c(+796):		vmovsd	qword ptr [rsp - 104], xmm0
+0x5c1392(+802):		vmulsd	xmm5, xmm0, xmm11
+0x5c1397(+807):		vaddsd	xmm0, xmm5, xmm4
+0x5c139b(+811):		vmovsd	qword ptr [rsp - 96], xmm0
+0x5c13a1(+817):		vmulsd	xmm0, xmm15, qword ptr [rdx + 8*rsi]
+0x5c13a6(+822):		vmovsd	xmm5, qword ptr [rsp - 24]
+0x5c13ac(+828):		vmulsd	xmm5, xmm5, xmm13
+0x5c13b1(+833):		vaddsd	xmm0, xmm0, xmm5
+0x5c13b5(+837):		vmulsd	xmm5, xmm10, xmm1
+0x5c13b9(+841):		vaddsd	xmm0, xmm0, xmm5
+0x5c13bd(+845):		vmulsd	xmm5, xmm9, xmm3
+0x5c13c1(+849):		vaddsd	xmm0, xmm0, xmm5
+0x5c13c5(+853):		vmovsd	xmm3, qword ptr [rsp - 112]
+0x5c13cb(+859):		vmulsd	xmm5, xmm3, xmm2
+0x5c13cf(+863):		vaddsd	xmm0, xmm5, xmm0
+0x5c13d3(+867):		vmulsd	xmm5, xmm8, xmm7
+0x5c13d7(+871):		vaddsd	xmm0, xmm5, xmm0
+0x5c13db(+875):		vmulsd	xmm5, xmm14, xmm6
+0x5c13df(+879):		vaddsd	xmm0, xmm5, xmm0
+0x5c13e3(+883):		lea	ecx, dword ptr [4*r9]
+0x5c13eb(+891):		movsxd	rcx, ecx
+0x5c13ee(+894):		vmulsd	xmm5, xmm12, qword ptr [rdi + 8*rcx]
+0x5c13f3(+899):		vaddsd	xmm0, xmm5, xmm0
+0x5c13f7(+903):		vmovsd	xmm5, qword ptr [rdi + 8*rcx + 8]
+0x5c13fd(+909):		vmovsd	xmm4, qword ptr [rsp - 64]
+0x5c1403(+915):		vmulsd	xmm15, xmm5, xmm4
+0x5c1407(+919):		vaddsd	xmm0, xmm15, xmm0
+0x5c140b(+923):		vmovsd	xmm15, qword ptr [rdi + 8*rcx + 16]
+0x5c1411(+929):		vmovaps	xmm6, xmm11
+0x5c1416(+934):		vmulsd	xmm7, xmm15, xmm6
+0x5c141a(+938):		vaddsd	xmm0, xmm7, xmm0
+0x5c141e(+942):		vmulsd	xmm2, xmm10, xmm13
+0x5c1423(+947):		vmovsd	xmm3, qword ptr [rsp - 8]
+0x5c1429(+953):		vmulsd	xmm3, xmm3, qword ptr [rdx + 8*rbx]
+0x5c142e(+958):		vaddsd	xmm2, xmm3, xmm2
+0x5c1432(+962):		vmulsd	xmm3, xmm9, xmm1
+0x5c1436(+966):		vaddsd	xmm2, xmm2, xmm3
+0x5c143a(+970):		vmovsd	xmm3, qword ptr [rsp - 32]
+0x5c1440(+976):		vmulsd	xmm3, xmm3, qword ptr [rsp - 40]
+0x5c1446(+982):		vaddsd	xmm2, xmm2, xmm3
+0x5c144a(+986):		vmulsd	xmm1, xmm8, qword ptr [rsp - 56]
+0x5c1450(+992):		vaddsd	xmm1, xmm1, xmm2
+0x5c1454(+996):		vmulsd	xmm2, xmm14, qword ptr [rsp - 16]
+0x5c145a(+1002):		vaddsd	xmm1, xmm2, xmm1
+0x5c145e(+1006):		vmovsd	xmm2, qword ptr [rsp - 104]
+0x5c1464(+1012):		vmulsd	xmm2, xmm2, qword ptr [rsp - 48]
+0x5c146a(+1018):		vaddsd	xmm1, xmm2, xmm1
+0x5c146e(+1022):		vmulsd	xmm2, xmm5, xmm12
+0x5c1473(+1027):		vaddsd	xmm1, xmm2, xmm1
+0x5c1477(+1031):		vmulsd	xmm2, xmm15, xmm4
+0x5c147b(+1035):		vaddsd	xmm1, xmm2, xmm1
+0x5c147f(+1039):		vmulsd	xmm2, xmm6, qword ptr [rdi + 8*rcx + 24]
+0x5c1485(+1045):		vaddsd	xmm1, xmm2, xmm1
+0x5c1489(+1049):		vmovsd	xmm2, qword ptr [rsp - 72]
+0x5c148f(+1055):		vmovsd	qword ptr [rdx + 8*r10], xmm2
+0x5c1495(+1061):		vmovsd	xmm2, qword ptr [rsp - 80]
+0x5c149b(+1067):		vmovsd	qword ptr [rdx + 8*r11], xmm2
+0x5c14a1(+1073):		vmovsd	xmm2, qword ptr [rsp - 88]
+0x5c14a7(+1079):		vmovsd	qword ptr [rdx + 8*rax + 8], xmm2
+0x5c14ad(+1085):		vmovsd	xmm2, qword ptr [rsp - 96]
+0x5c14b3(+1091):		vmovsd	qword ptr [rdx + 8*r14], xmm2
+0x5c14b9(+1097):		vmovsd	qword ptr [rdx + 8*rsi], xmm0
+0x5c14be(+1102):		vmovsd	qword ptr [rdx + 8*rbx], xmm1
+0x5c14c3(+1107):		pop	rbx
+0x5c14c4(+1108):		pop	r14
+0x5c14c6(+1110):		pop	r15
+0x5c14c8(+1112):		ret
+kernel.lua:166: Errors reported during specialization.
+kernel.lua:132: variable 'l1matmul' not found
+						l1matmul(A + m*lda + n,
+						       ^
+
+stack traceback:
+	[C]: in function 'error'
+	src/terralib.lua:481: in function 'finishandabortiferrors'
+	src/terralib.lua:2152: in function 'specialize'
+	src/terralib.lua:975: in function 'newfunctiondefinition'
+	src/terralib.lua:1120: in function 'genconvolution'
+	kernel.lua:166: in main chunk

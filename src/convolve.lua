@@ -228,7 +228,7 @@ terra Image:convolve(ker: Filter)
             out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
           end
         end
-      end):printpretty()]
+      end):printpretty()] 
   end
   backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)

@@ -177,9 +177,9 @@ int main() {
 		int m = i;
 		int n = i;
 		int k = i;
-		
+		testsize(m,n,k);
 		if(m*n+ m*k+n*k > 3*2048*2048) //usually max img resolution
-			testsize(m,n,k);//A and B are suppose to be at max by dgemm: 1024x1024 x 3, so 2 x 1024x1024
+				//A and B are suppose to be at max by dgemm: 1024x1024 x 3, so 2 x 1024x1024
 			break;
 	}
 	//testsize(5000,5000,5000);
