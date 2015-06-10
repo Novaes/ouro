@@ -1,13 +1,13 @@
-IO = terralib.includec("stdio.h")
+lib.includec("stdio.h")
 local number = double
 
 terra pmatrix(a: double[3][3], M: int, N: int)
-	for i=0,M do
-		for j=0,N do
-			IO.printf("%lf ",a[i][j])
-		end
-		IO.printf("\n")
-	end	
+  for i=0,M do
+    for j=0,N do
+      IO.printf("%lf ",a[i][j])
+    end
+    IO.printf("\n")
+  end
 end
 
 local number = double
@@ -53,8 +53,8 @@ function genkernel()
     -- printvec(caddr,RM)
     local vector_type = vector(number,V)
     local vector_pointer = &vector_type
-    local loadc = terralib.newlist() 
-    
+    local loadc = terralib.newlist()
+
     for m=0,(RM-1)*V do
         loadc:insert(quote
             var [caddr[m]] = C + m*V

@@ -222,19 +222,19 @@ terra Image:convolve(ker: Filter)
      [blockedloop(iRows, iCols, kRows, kCols, {1,2,3}, function(i,j,ki,kj)
       return
         quote
-          -- IO.printf("%d %d %d %d\n",i,j,ki,kj)
+          -- cstdio.printf("%d %d %d %d\n",i,j,ki,kj)
           x, y = i + (ki - kCenterY), j + (kj - kCenterX)
           if x >= 0 and x<iRows and y>=0 and y<iCols then
             out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
           end
         end
-      end):printpretty()] 
+      end)] 
   end
   backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)
 end
 
-terra Image:convolutiontuned(ker: Filter)
+terra Image:convolvetuned(ker: Filter)
   var iRows = self.width
   var iCols = self.height
   var kRows = ker.width
@@ -272,13 +272,13 @@ terra Image:convolutiontuned(ker: Filter)
      [blockedloop(iRows, iCols, kRows, kCols, {1,2,3}, function(i,j,ki,kj)
       return
         quote
-          -- IO.printf("%d %d %d %d\n",i,j,ki,kj)
+          -- cstdio.printf("%d %d %d %d\n",i,j,ki,kj)
           x, y = i + (ki - kCenterY), j + (kj - kCenterX)
           if x >= 0 and x<iRows and y>=0 and y<iCols then
             out[i * iCols + j] = out[i * iCols + j] + [double](img[x * iCols + y]) * weights[ki * kCols + kj]
           end
         end
-      end):printpretty()]
+      end)]
   end
   backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)
@@ -298,6 +298,15 @@ terra Filter:load()
   return self:init(width,height,width,divisor,false,weights)
 end
 
+
+terra conv(inp: Image,ker: Filter)
+  inp:convolve(ker)
+end
+
+terra naive(inp : Image, ker : Filter)
+  inp:naiveconv(ker)
+end
+
 local terra loadAndRun(argc: int, argv: &rawstring)
 
   -- loading image
@@ -310,10 +319,10 @@ local terra loadAndRun(argc: int, argv: &rawstring)
 
   -- convolve
   ker:flip()
+
   inp:convolve(ker)
-
-  --inp:convolve(ker)
-
+  -- inp:naiveconv(ker)
+  -- print(runBenchmark(naive(inp,ker)))
   -- print(runBenchmark(testing))
 
   var out: Image

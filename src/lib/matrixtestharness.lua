@@ -47,33 +47,34 @@ function printMatrix(m,rows,columns)
 end
 
 function MTH.timefunctions(typstring,M,N,K,L,...)
-
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
 	local A = ffi.new(ctyp,M*N) 
 	local B = ffi.new(ctyp,K*L)
 
-	--simple example
-	for m = 0, M-1 do
-		for n = 0, N-1 do
-			if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
-				A[m*N + n] = 0
-			else
-				A[m*N + n] = (m-1)*(N-2) + n
-			end
-		end
-	end
+	-- specific example A
+	-- for m = 0, M-1 do
+	-- 	for n = 0, N-1 do
+	-- 		if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
+	-- 			A[m*N + n] = 0
+	-- 		else
+	-- 			A[m*N + n] = (m-1)*(N-2) + n
+	-- 		end
+	-- 	end
+	-- end
 
+	-- specific example B
 	B[0] = 1; B[1] = 2; B[2] = 1;
 	B[3] = 0; B[4] = 0; B[5] = 0;
 	B[6] = -1;B[7] =-2; B[8] = -1;
 
-	-- randomizing
-	-- for m = 0, M-1 do
-	-- 	for n = 0, N-1 do
-	-- 		A[m*N + n] = math.random(0,9)
-	-- 	end
-	-- end
+	-- randomizer A
+	for m = 0, M-1 do
+		for n = 0, N-1 do
+			A[m*N + n] = math.random(0,9)
+		end
+	end
 
+	-- randomizer B
 	-- for k = 0, K-1 do
 	-- 	for l = 0, L-1 do
 	-- 		B[k*L + l] = math.random(0,9)
@@ -88,16 +89,9 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local C = ffi.new(ctyp,M*N)
 		for j = 0, M * N - 1 do 
 			C[j] = 0
-		 -- C[j] = -1 -- for DGEMM
 		end	
 		Cs[i] = C
 	end
-
-	-- local C = ffi.new(ctyp,M*N)
-	-- for j = 0, M * N - 1 do 
-	-- 	C[j] = 0
-	-- end	
-
 
 	-- compute 
 	local results = {}
@@ -109,6 +103,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		-- printMatrix(A,M,N)
 		-- printMatrix(B,K,L)
 		-- printMatrix(C,M,N)
+		results[i] = CalcTime(tocall)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then
 			local C0 = Cs[1]

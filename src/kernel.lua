@@ -9,7 +9,7 @@ local dotune = true
 
 -- naive convolution
 -- terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
--- for 0..NB do for 0..NB do 
+
 function symmat(name,I,...)
 	if not I then return symbol(name) end
 	local r = {}
@@ -36,7 +36,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
 	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
 	
-	print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
+	-- print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
 	
 	local M,N = NB,NB -- new
 	local VP = &vector(double,V)
@@ -128,7 +128,7 @@ function genconvolution(NB,NBF,RM,RN,V)
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
-	local NB2 = NB
+	local NB2 = NB * NBF
 
 	-- EXAMPLES
 	--local l1matmul = genkernel(NB, 3, 2, 1, false, 3, 3) 
@@ -158,18 +158,20 @@ function genconvolution(NB,NBF,RM,RN,V)
 	end
 end
 
--- local blocksizes = {16,24,32,40,48,56,64}
-local blocksizes = {5}
--- local regblocks = {1,2,4}
-local regblocks = {5}
+local blocksizes = {16,24,32,40,48,56,64,1024}
+-- local blocksizes = {5}
+-- local blocksizes = {1024}
+local regblocks = {2,4,5,1}
+-- local regblocks = {5}
+-- local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
---initialized (defined structure of best)
+-- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
-	--local tunefor = 1024
-	local tunefor = 5
+	local tunefor = 1024
+	-- local tunefor = 5
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
@@ -184,11 +186,12 @@ if dotune then
 						local curr_gflops = 0
 						local ctyp
 						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)   
-                        		my_conv(nil,M,N,K,L,1.0,A,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2 
+                        		my_conv(nil,M,N,K,L,1.0,A,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 						end)
 						if not correct then	print("<error>")  break  end
 						print(i,unpack (exectimes))
 						local curr_gflops = exectimes[1]
+						-- print(curr_gflops) -- print analysis 
 						if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
 							best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
 							terralib.tree.printraw(best)
@@ -198,6 +201,7 @@ if dotune then
 			end
 		end
 	end
+	terralib.tree.printraw(best)
 end
 
 local my_convolution = genconvolution(best.b,5,best.rm,best.rn,best.v)
