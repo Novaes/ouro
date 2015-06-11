@@ -46,33 +46,47 @@ function printMatrix(m,rows,columns)
   io.write("\n")
 end
 
+-- create a 1-9 with 0 padding border, used for test convolution
+function fillpart(A,sM,eM,sN,eN,M,N) 
+	local counter = 0
+	for m = sM, eM do 
+		for n = sN, eN do
+			if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
+				A[m*N + n] = 0
+			else
+				A[m*N + n] = counter + 1
+				counter = (counter + 1) % 9
+			end
+		end
+	end
+end
+
+function generateA(A, M, N)
+	fillpart(A,0,(M-4)/2,0,(N-4)/2,M,N)
+	fillpart(A,0,(M-4)/2,(M-4)/2 + (N-4)/2,N-1,M,N)
+	fillpart(A,(M-4)/2 + (M-4)/2,M-1,0,(N-4)/2,M,N)
+	fillpart(A,(M-4)/2 + (M-4)/2,M-1,(N-4)/2 + (N-4)/2,N-1,M,N)
+end
+
 function MTH.timefunctions(typstring,M,N,K,L,...)
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
 	local A = ffi.new(ctyp,M*N) 
 	local B = ffi.new(ctyp,K*L)
 
-	-- specific example A
-	-- for m = 0, M-1 do
-	-- 	for n = 0, N-1 do
-	-- 		if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
-	-- 			A[m*N + n] = 0
-	-- 		else
-	-- 			A[m*N + n] = (m-1)*(N-2) + n
-	-- 		end
-	-- 	end
-	-- end
-
+	--specific example A
+	generateA(A, M, N)
+	
 	-- specific example B
 	B[0] = 1; B[1] = 2; B[2] = 1;
 	B[3] = 0; B[4] = 0; B[5] = 0;
 	B[6] = -1;B[7] =-2; B[8] = -1;
 
 	-- randomizer A
-	for m = 0, M-1 do
-		for n = 0, N-1 do
-			A[m*N + n] = math.random(0,9)
-		end
-	end
+	-- for m = 0, M-1 do
+	-- 	for n = 0, N-1 do
+	-- 		A[m*N + n] = math.random(0,9)
+	-- 	end
+	-- end
 
 	-- randomizer B
 	-- for k = 0, K-1 do
@@ -100,9 +114,9 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local tocall = function() fn(M,N,K,L,A,B,C) end
 		tocall()
 		CalcTime(tocall) -- execution time
-		-- printMatrix(A,M,N)
-		-- printMatrix(B,K,L)
-		-- printMatrix(C,M,N)
+		printMatrix(A,M,N)
+		printMatrix(B,K,L)
+		printMatrix(C,M,N)
 		results[i] = CalcTime(tocall)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then

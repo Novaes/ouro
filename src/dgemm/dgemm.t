@@ -5,7 +5,6 @@ local function isinteger(x) return math.floor(x) == x end
 
 local NB = 48
 terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
-
 	for m = 0, NB do
 		for n = 0, NB do
 			C[m*ldc + n] = alpha * C[m*ldc + n]
@@ -14,7 +13,6 @@ terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int,
 			end
 		end
 	end
-
 end
 
 function symmat(name,I,...)
@@ -62,6 +60,7 @@ function genl1matmul(NB, NK, RM, RN, V,prefetch)
 
 	local calcc = terralib.newlist()
 
+
 	for kb = 0, NK/V-1 do
 		local kbV = kb*V
 
@@ -93,6 +92,8 @@ function genl1matmul(NB, NK, RM, RN, V,prefetch)
 			end
 		end
 	end
+
+
 
 	return terra([A] : &double, [B] : &double, [C] : &double, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		for [mm] = 0, NB, RM do
