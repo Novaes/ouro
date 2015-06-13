@@ -61,11 +61,11 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		for n = 0, RN+1 do
 			loadA:insert(quote
 				-- mm+1 and nn+1 because I start from -1 now 
-				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n) 
+				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n*V)
 				end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
-					var [c[m][n]] = alpha * vecload(C,(mm+m)*ldc + nn + n)
+					var [c[m][n]] = alpha * vecload(C,(mm+m)*ldc + nn + n*V)
 					end)
 				storec:insert(quote
 					vecstore(C,(mm+m)*ldc + nn + n,[c[m][n]])
@@ -169,11 +169,11 @@ end
 local blocksizes = {5}
 -- local blocksizes = {1024}
 -- local regblocks = {2,4,5,1}
--- local regblocks = {5}
 local regblocks = {1}
 -- local regblocks = {1}
+-- local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
-local vectors = {1}
+local vectors = {5}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 

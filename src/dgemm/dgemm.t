@@ -3,7 +3,7 @@ local stdlib = terralib.includec("stdlib.h")
 
 local function isinteger(x) return math.floor(x) == x end
 
-local NB = 48
+local NB = 10
 terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
 	for m = 0, NB do
 		for n = 0, NB do
@@ -25,8 +25,7 @@ function symmat(name,I,...)
 end
 
 
-function genl1matmul(NB, NK, RM, RN, V,prefetch)
-	
+function genl1matmul(NB, NK, RM, RN, V, prefetch)
 	assert(isinteger(NB / (RN*V)))
 	assert(isinteger(NB / RM))
 
@@ -59,11 +58,8 @@ function genl1matmul(NB, NK, RM, RN, V,prefetch)
 	end
 
 	local calcc = terralib.newlist()
-
-
 	for kb = 0, NK/V-1 do
 		local kbV = kb*V
-
 		for m = 0, RM-1 do
 			calcc:insert(quote
 				var [a[kb][m]] = vecload(A,(mm+m)*lda + kk + kbV)
@@ -93,8 +89,6 @@ function genl1matmul(NB, NK, RM, RN, V,prefetch)
 		end
 	end
 
-
-
 	return terra([A] : &double, [B] : &double, [C] : &double, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		for [mm] = 0, NB, RM do
 			for [nn] = 0, NB,RN*V do
@@ -109,7 +103,7 @@ function genl1matmul(NB, NK, RM, RN, V,prefetch)
 end
 
 local NB2 = 8 * NB
-local l1matmul = genl1matmul(NB,4, 3, 2, 4)
+local l1matmul = genl1matmul(NB, 5, 1, 1, 5):printpretty()
 
 terra min(a : int, b : int)
 	return terralib.select(a < b, a, b)
@@ -125,7 +119,6 @@ terra my_dgemm(gettime : {} -> double, M : int, N : int, K : int, alpha : double
 						for n = nn,min(nn+NB2,N),NB do
 							for k = kk,min(kk+NB2,K),NB do
 							 --for l=ll,min(ll+NB2,L),NB do
-
 								--two nested loops, convolution here
 								l1matmul(A + m*lda + k,
 								         B + k*ldb + n,

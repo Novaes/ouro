@@ -1,0 +1,105 @@
+dgemm.t:92:             anon (dgemm.t:92) = terra($A : &double,$B : &double,$C : &double,$lda : int32,$ldb : int32,$ldc : int32,$alpha : double) : {}
+dgemm.t:93:                 for $mn : int32 = 0,10,5 do
+dgemm.t:94:                     for $nn : int32 = 0,10,5 * 1 do
+dgemm.t:52:                         var $c00 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 0 * 1)
+                                    var $c01 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 1 * 1)
+                                    var $c02 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 2 * 1)
+                                    var $c03 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 3 * 1)
+                                    var $c04 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 0) * $ldc + $nn + 4 * 1)
+                                    var $c10 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 0 * 1)
+                                    var $c11 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 1 * 1)
+                                    var $c12 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 2 * 1)
+                                    var $c13 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 3 * 1)
+                                    var $c14 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 1) * $ldc + $nn + 4 * 1)
+                                    var $c20 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 0 * 1)
+                                    var $c21 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 1 * 1)
+                                    var $c22 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 2 * 1)
+                                    var $c23 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 3 * 1)
+                                    var $c24 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 2) * $ldc + $nn + 4 * 1)
+                                    var $c30 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 3) * $ldc + $nn + 0 * 1)
+                                    var $c31 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 3) * $ldc + $nn + 1 * 1)
+                                    var $c32 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 3) * $ldc + $nn + 2 * 1)
+                                    var $c33 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 3) * $ldc + $nn + 3 * 1)
+                                    var $c34 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 3) * $ldc + $nn + 4 * 1)
+                                    var $c40 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 4) * $ldc + $nn + 0 * 1)
+                                    var $c41 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 4) * $ldc + $nn + 1 * 1)
+                                    var $c42 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 4) * $ldc + $nn + 2 * 1)
+                                    var $c43 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 4) * $ldc + $nn + 3 * 1)
+                                    var $c44 : vector(double,1) = [vector(double,1)]($alpha) * vecload($C, ($mn + 4) * $ldc + $nn + 4 * 1)
+dgemm.t:96:                         for $kk : int32 = 0,10,1 do
+dgemm.t:65:                             var $a00 : vector(double,1) = vecload($A, ($mn + 0) * $lda + $kk + 0)
+                                        var $a01 : vector(double,1) = vecload($A, ($mn + 1) * $lda + $kk + 0)
+                                        var $a02 : vector(double,1) = vecload($A, ($mn + 2) * $lda + $kk + 0)
+                                        var $a03 : vector(double,1) = vecload($A, ($mn + 3) * $lda + $kk + 0)
+                                        var $a04 : vector(double,1) = vecload($A, ($mn + 4) * $lda + $kk + 0)
+dgemm.t:73:                             var $b00 : vector(double,1) = vecload($B, ($kk + 0) * $ldb + $nn + 0 * 1)
+                                        var $b01 : vector(double,1) = vecload($B, ($kk + 0) * $ldb + $nn + 1 * 1)
+                                        var $b02 : vector(double,1) = vecload($B, ($kk + 0) * $ldb + $nn + 2 * 1)
+                                        var $b03 : vector(double,1) = vecload($B, ($kk + 0) * $ldb + $nn + 3 * 1)
+                                        var $b04 : vector(double,1) = vecload($B, ($kk + 0) * $ldb + $nn + 4 * 1)
+dgemm.t:80:                             $c00 = $c00 + [vector(double,1)]($a00[0]) * $b00
+                                        $c01 = $c01 + [vector(double,1)]($a00[0]) * $b01
+                                        $c02 = $c02 + [vector(double,1)]($a00[0]) * $b02
+                                        $c03 = $c03 + [vector(double,1)]($a00[0]) * $b03
+                                        $c04 = $c04 + [vector(double,1)]($a00[0]) * $b04
+                                        $c10 = $c10 + [vector(double,1)]($a01[0]) * $b00
+                                        $c11 = $c11 + [vector(double,1)]($a01[0]) * $b01
+                                        $c12 = $c12 + [vector(double,1)]($a01[0]) * $b02
+                                        $c13 = $c13 + [vector(double,1)]($a01[0]) * $b03
+                                        $c14 = $c14 + [vector(double,1)]($a01[0]) * $b04
+                                        $c20 = $c20 + [vector(double,1)]($a02[0]) * $b00
+                                        $c21 = $c21 + [vector(double,1)]($a02[0]) * $b01
+                                        $c22 = $c22 + [vector(double,1)]($a02[0]) * $b02
+                                        $c23 = $c23 + [vector(double,1)]($a02[0]) * $b03
+                                        $c24 = $c24 + [vector(double,1)]($a02[0]) * $b04
+                                        $c30 = $c30 + [vector(double,1)]($a03[0]) * $b00
+                                        $c31 = $c31 + [vector(double,1)]($a03[0]) * $b01
+                                        $c32 = $c32 + [vector(double,1)]($a03[0]) * $b02
+                                        $c33 = $c33 + [vector(double,1)]($a03[0]) * $b03
+                                        $c34 = $c34 + [vector(double,1)]($a03[0]) * $b04
+                                        $c40 = $c40 + [vector(double,1)]($a04[0]) * $b00
+                                        $c41 = $c41 + [vector(double,1)]($a04[0]) * $b01
+                                        $c42 = $c42 + [vector(double,1)]($a04[0]) * $b02
+                                        $c43 = $c43 + [vector(double,1)]($a04[0]) * $b03
+                                        $c44 = $c44 + [vector(double,1)]($a04[0]) * $b04
+dgemm.t:96:                         end
+dgemm.t:55:                         r0x008dfb68 = vecstore($C, ($mn + 0) * $ldc + $nn + 0 * 1, $c00)
+                                    r0x008e1fb0 = vecstore($C, ($mn + 0) * $ldc + $nn + 1 * 1, $c01)
+                                    r0x008e4480 = vecstore($C, ($mn + 0) * $ldc + $nn + 2 * 1, $c02)
+                                    r0x008e6958 = vecstore($C, ($mn + 0) * $ldc + $nn + 3 * 1, $c03)
+                                    r0x00885cb8 = vecstore($C, ($mn + 0) * $ldc + $nn + 4 * 1, $c04)
+                                    r0x008eb748 = vecstore($C, ($mn + 1) * $ldc + $nn + 0 * 1, $c10)
+                                    r0x008edc18 = vecstore($C, ($mn + 1) * $ldc + $nn + 1 * 1, $c11)
+                                    r0x008f00e8 = vecstore($C, ($mn + 1) * $ldc + $nn + 2 * 1, $c12)
+                                    r0x008f25b8 = vecstore($C, ($mn + 1) * $ldc + $nn + 3 * 1, $c13)
+                                    r0x008f4d18 = vecstore($C, ($mn + 1) * $ldc + $nn + 4 * 1, $c14)
+                                    r0x008f71e8 = vecstore($C, ($mn + 2) * $ldc + $nn + 0 * 1, $c20)
+                                    r0x008f96b8 = vecstore($C, ($mn + 2) * $ldc + $nn + 1 * 1, $c21)
+                                    r0x008fbb88 = vecstore($C, ($mn + 2) * $ldc + $nn + 2 * 1, $c22)
+                                    r0x008fe1d8 = vecstore($C, ($mn + 2) * $ldc + $nn + 3 * 1, $c23)
+                                    r0x00900970 = vecstore($C, ($mn + 2) * $ldc + $nn + 4 * 1, $c24)
+                                    r0x00902e40 = vecstore($C, ($mn + 3) * $ldc + $nn + 0 * 1, $c30)
+                                    r0x00905310 = vecstore($C, ($mn + 3) * $ldc + $nn + 1 * 1, $c31)
+                                    r0x00907860 = vecstore($C, ($mn + 3) * $ldc + $nn + 2 * 1, $c32)
+                                    r0x00909d30 = vecstore($C, ($mn + 3) * $ldc + $nn + 3 * 1, $c33)
+                                    r0x0090c2f8 = vecstore($C, ($mn + 3) * $ldc + $nn + 4 * 1, $c34)
+                                    r0x0090e7c8 = vecstore($C, ($mn + 4) * $ldc + $nn + 0 * 1, $c40)
+                                    r0x00910c98 = vecstore($C, ($mn + 4) * $ldc + $nn + 1 * 1, $c41)
+                                    r0x00913168 = vecstore($C, ($mn + 4) * $ldc + $nn + 2 * 1, $c42)
+                                    r0x00915638 = vecstore($C, ($mn + 4) * $ldc + $nn + 3 * 1, $c43)
+                                    r0x00917b08 = vecstore($C, ($mn + 4) * $ldc + $nn + 4 * 1, $c44)
+dgemm.t:94:                     end
+dgemm.t:93:                 end
+dgemm.t:92:             end
+dgemm.t:112: Errors reported during specialization.
+dgemm.t:123: variable 'l1matmul' not found
+								l1matmul(A + m*lda + k,
+								       ^
+
+stack traceback:
+	[C]: in function 'error'
+	src/terralib.lua:481: in function 'finishandabortiferrors'
+	src/terralib.lua:2152: in function 'specialize'
+	src/terralib.lua:975: in function 'newfunctiondefinition'
+	src/terralib.lua:1105: in function 'defineobjects'
+	dgemm.t:112: in main chunk
