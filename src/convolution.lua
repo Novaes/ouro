@@ -60,18 +60,19 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		for n = 0, RN+1 do
 			loadA:insert(quote
 				-- mm+1 and nn+1 because I start from -1 now 
-				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n)
-				end)
+				var [a[m][n]] = vecload(A, m*ldc + n)
+			end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
-					var [c[m][n]] = alpha * vecload(C,(mm+m)*ldc + nn + n*V)
-					end)
+					var [c[m][n]] = alpha * vecload(C, (m+1)*ldc + (n+1)*V)
+				end)
 				storec:insert(quote
-					vecstore(C,(mm+m)*ldc + nn + n,[c[m][n]])
-					end)
+					vecstore(C, (m+1)*ldc + (n+1), [c[m][n]])
+				end)
 			end
 		end
 	end
+
 
 	local calcc = terralib.newlist()
 
@@ -105,14 +106,18 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		-- no borders, original from 0 to NB-1
 		for [mm] = 1, NB-2, RM do
-			for [nn] = 1, NB-2, RN do
+			for [nn] = 1, NB-2, RN*V do
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				[calcc];
 				[storec];
+				A = A + (RN+2)*V -- more adjusts
+				C = C + RN*V
 			end
+			A = A + (RM+2) * ldc - NB
+			C = C + RM * ldc - NB
 		end
 	end
 end
@@ -165,27 +170,27 @@ end
 
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
 -- local blocksizes = {5}
-local blocksizes = {5}
+local blocksizes = {10}
 -- local blocksizes = {1024}
 -- local regblocks = {2,4,5,1}
-local regblocks = {1}
+local regblocks = {5}
 -- local regblocks = {1}
 -- local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
-local vectors = {5}
+local vectors = {1}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 10
+	local tunefor = 10 -- full size of the matrix
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
 					-- same until here
-					local my_conv = genconvolution(b,5,rm,rn,v)
+					local my_conv = genconvolution(b,1,rm,rn,v)
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
@@ -193,7 +198,7 @@ if dotune then
 						local curr_gflops = 0
 						local ctyp
 						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-                        		my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+                        	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 						end)
 						if not correct then	print("<error>")  break  end
 						print(i,unpack (exectimes))
@@ -208,8 +213,9 @@ if dotune then
 			end
 		end
 	end
+	io.write("\nBest: ")
 	terralib.tree.printraw(best)
 end
 
-local my_convolution = genconvolution(best.b,5,best.rm,best.rn,best.v)
+local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
 terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
