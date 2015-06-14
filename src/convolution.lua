@@ -10,7 +10,6 @@ local dotune = true
 
 -- naive convolution
 -- terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
-
 function symmat(name,I,...)
 	if not I then return symbol(name) end
 	local r = {}
@@ -37,7 +36,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
 	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
 	-- print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
-	
+
 	local M,N = NB,NB
 	local VP = &vector(double,V)
 	local terra vecload(data : &double, idx : int)
@@ -61,7 +60,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		for n = 0, RN+1 do
 			loadA:insert(quote
 				-- mm+1 and nn+1 because I start from -1 now 
-				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n*V)
+				var [a[m][n]] = vecload(A,( (mm-1) + m)*ldc + (nn-1) + n)
 				end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
@@ -80,7 +79,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	for  k=0, K-1 do
 		for l = 0, L-1 do
 			loadkernel:insert(quote
-				var [b[k][l]] = vecload(B, k*ldb + l)
+				var [b[k][l]] = vecload(B, k*ldb + l*V)
 			end)
 		end
 	end

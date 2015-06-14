@@ -1,16 +1,15 @@
-
 local C = terralib.includecstring [[
 
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
 
-const uint64_t nsInSec = 1000000000;
+const uint64_t msInNs = 1000;
 
 inline uint64_t nowNs() {
   struct timeval tv;
   gettimeofday(&tv, 0);
-  return ((uint64_t)tv.tv_sec) * nsInSec + /*[tv.tv_nsec]*/tv.tv_usec; 
+  return ((uint64_t)tv.tv_usec) * msInNs + tv.tv_usec; 
 }
 ]]
 
@@ -21,7 +20,7 @@ terra nowNs()
 end
 
 terra runBenchmark(fn : {} -> {})
-  var maxIter : int = 1000
+  var maxIter : int = 5
   var maxTime : int = 1000000000 -- 1 second
 
   -- collect execution times
@@ -62,14 +61,15 @@ terra runBenchmark(fn : {} -> {})
   return times(p50)
 end
 
---[[
+--[[ -- EXAMPLE
 terra testing()
-  nowNs()
+  print("Hi")
+  -- nowNs()
 end
 
 terra main()
   print(runBenchmark(testing))
 end
+
 main()
 ]]
-

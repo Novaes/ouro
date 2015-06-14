@@ -65,7 +65,7 @@ function genl1matmul(NB, NK, RM, RN, V, prefetch)
 				var [a[kb][m]] = vecload(A,(mm+m)*lda + kk + kbV)
 			end)
 		end
-		for v = 0, V-1 do
+		for v = 0, V-1 do 
 			local k = kbV+v
 			if not prefetch or (v == 0 and kb == 0) then
 				for n = 0, RN-1 do
@@ -93,9 +93,9 @@ function genl1matmul(NB, NK, RM, RN, V, prefetch)
 		for [mm] = 0, NB, RM do
 			for [nn] = 0, NB,RN*V do
 				[loadc];
-				for [kk] = 0, NB, NK do
-					[calcc];
-				end
+							for [kk] = 0, NB, NK do
+								[calcc];
+							end
 				[storec];
 			end
 		end

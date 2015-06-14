@@ -308,7 +308,6 @@ terra naive(inp : Image, ker : Filter)
 end
 
 local terra loadAndRun(argc: int, argv: &rawstring)
-
   -- loading image
   var inp: Image
   inp:load("images/lena.bmp")
@@ -316,15 +315,13 @@ local terra loadAndRun(argc: int, argv: &rawstring)
   -- loading kernel
   var ker: Filter
   ker:load(argc, argv)
-
+  
   -- convolve
   ker:flip()
 
   inp:convolve(ker)
   -- inp:naiveconv(ker)
-  -- print(runBenchmark(naive(inp,ker)))
-  -- print(runBenchmark(testing))
-
+  
   var out: Image
   out = inp
   out:save("images/lena_out.bmp")
