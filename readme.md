@@ -11,5 +11,5 @@
         image.t:image library
         matrixtestharness.t: time measure in the auto-tuning process
 
- 
-      
+    tags for branches:
+    dev/ or wip/: working in progress; associated with a feature

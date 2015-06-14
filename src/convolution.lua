@@ -8,8 +8,7 @@ local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} ->
 
 local dotune = true
 
--- naive convolution
--- terra naivel1matmul(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
+-- terra naivel1conv(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
 function symmat(name,I,...)
 	if not I then return symbol(name) end
 	local r = {}
@@ -105,6 +104,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- optimization point
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		-- no borders, original from 0 to NB-1
+		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
 		for [mm] = 1, NB-2, RM+2 do
 			for [nn] = 1, NB-2, (RN+2)*V do
 				[loadc];
@@ -113,7 +113,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 				[loadA];
 				[calcc];
 				[storec];
-				A = A + (RN+2)*V -- more adjusts
+				A = A + (RN+2)*V 
 				C = C + (RN+2)*V
 			end
 			A = A + (RM+2) * ldc - NB
@@ -150,8 +150,8 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local NB2 = NB * NBF
 
 	-- EXAMPLES
-	--local l1matmul = genkernel(NB, 3, 2, 1, false, 3, 3) 
-	local l1matmul = genkernel(NB, 3, 3, 1, false, 3, 3)
+	--local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3) 
+	local l1conv = genkernel(NB, 3, 3, 1, false, 3, 3)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -159,7 +159,7 @@ function genconvolution(NB,NBF,RM,RN,V)
 		[ blockedloop(N,M,{NB2,NB},
 			function(m,n) return quote
 			-- var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
-			l1matmul(A + m*lda + n,
+			l1conv(A + m*lda + n,
 	         B, -- B, fixed kernel
 	         C + m*ldc + n,
 	         sda,lda,ldb,ldc,0)
