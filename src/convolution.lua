@@ -105,8 +105,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- optimization point
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
 		-- no borders, original from 0 to NB-1
-		for [mm] = 1, NB-2, RM do
-			for [nn] = 1, NB-2, RN*V do
+		for [mm] = 1, NB-2, RM+2 do
+			for [nn] = 1, NB-2, (RN+2)*V do
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
@@ -114,10 +114,10 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 				[calcc];
 				[storec];
 				A = A + (RN+2)*V -- more adjusts
-				C = C + RN*V
+				C = C + (RN+2)*V
 			end
 			A = A + (RM+2) * ldc - NB
-			C = C + RM * ldc - NB
+			C = C + (RM+2) * ldc - NB
 		end
 	end
 end
