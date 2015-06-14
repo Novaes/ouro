@@ -114,22 +114,17 @@ terra my_dgemm(gettime : {} -> double, M : int, N : int, K : int, alpha : double
 	for mm = 0,M,NB2 do
 		for nn = 0,N,NB2 do
 			for kk = 0,K, NB2 do
-			-- for ll = 0,L,NB2 do 
-					for m = mm,min(mm+NB2,M),NB do
-						for n = nn,min(nn+NB2,N),NB do
-							for k = kk,min(kk+NB2,K),NB do
-							 --for l=ll,min(ll+NB2,L),NB do
-								--two nested loops, convolution here
-								l1matmul(A + m*lda + k,
-								         B + k*ldb + n,
-								         C + m*ldc + n,
-								         lda,ldb,ldc, terralib.select(k == 0,0,1))
+				for m = mm,min(mm+NB2,M),NB do
+					for n = nn,min(nn+NB2,N),NB do
+						for k = kk,min(kk+NB2,K),NB do
+							l1matmul(A + m*lda + k,
+							         B + k*ldb + n,
+							         C + m*ldc + n,
+							         lda,ldb,ldc, terralib.select(k == 0,0,1))
 
-							 --end
-							end
 						end
 					end
-			  --end
+				end
 			end
 		end
 	end

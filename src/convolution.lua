@@ -31,13 +31,22 @@ function printMatrix(m,rows,columns)
 end
 
 -- generate L1 convolution 
-function genkernel(NB, RM, RN, V, prefetch, K, L)
+function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
+	local M,N, boundaryargs
+	-- if one of the parameters is lower than NB then receive the usual
+	if boundary then 
+		M,N = symbol(int64,"M"),symbol(int64,"N")
+		boundaryargs = terralib.newlist({M,N})
+	else
+		boundaryargs = terralib.newlist()
+		M,N = NB,NB
+	end
+
 	-- assert: no boundary cases
 	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
 	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
 	-- print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
 
-	local M,N = NB,NB
 	local VP = &vector(double,V)
 	local terra vecload(data : &double, idx : int)
 		var addr = &data[idx]
@@ -102,10 +111,10 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	end
 
 	-- optimization point
-	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
+	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1
-		for [mm] = 1, NB-2, RM do
-			for [nn] = 1, NB-2, RN do
+		for [mm] = 1, NB-2, RM+2 do
+			for [nn] = 1, NB-2, RN+2 do
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
@@ -146,26 +155,36 @@ function genconvolution(NB,NBF,RM,RN,V)
 
 	-- EXAMPLES
 	--local l1matmul = genkernel(NB, 3, 2, 1, false, 3, 3) 
-	local l1matmul = genkernel(NB, 3, 3, 1, false, 3, 3)
+	local l1conv0 = genkernel(NB, 3, 3, 1, false, 3, 3, false)
+	local l1conv0b = genkernel(NB, 3, 3, 1, false, 3, 3, true)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
-		[ blockedloop(N,M,{NB2,NB},
-			function(m,n) return quote
-			-- var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
-			l1matmul(A + m*lda + n,
-	         B, -- B, fixed kernel
-	         C + m*ldc + n,
-	         sda,lda,ldb,ldc,0)
-		end end) ]
+		[ blockedloop(N,M,{NB2,NB},function(m,n) 
+			return quote
+				var MM,NN = min(M-m,NB),min(N-n,NB)
+				var isboundary = MM < NB or NN < NB
+				var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+				if isboundary then -- do not enter here YET
+					l1conv0b(AA,
+			         B,
+			         CC,
+			         sda,lda,ldb,ldc,0,MM,NN)
+				else
+					l1conv0(AA,
+			         B,
+			         CC,
+			         sda,lda,ldb,ldc,0)
+				end
+			end end) ]
 		-- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
 	end
 end
 
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
 -- local blocksizes = {5}
-local blocksizes = {5}
+local blocksizes = {10}
 -- local blocksizes = {1024}
 -- local regblocks = {2,4,5,1}
 local regblocks = {1}
