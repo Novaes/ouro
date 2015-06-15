@@ -59,7 +59,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		for n = 0, RN+1 do
 			loadA:insert(quote
 				-- mm+1 and nn+1 because I start from -1 now 
-				var [a[m][n]] = vecload(A, m*ldc + n)
+				var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
@@ -71,7 +71,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 			end
 		end
 	end
-
 
 	local calcc = terralib.newlist()
 
@@ -103,21 +102,26 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 
 	-- optimization point
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double)
-		-- no borders, original from 0 to NB-1
+		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
-		for [mm] = 1, NB-2, RM+2 do
-			for [nn] = 1, NB-2, (RN+2)*V do
+		for [mm] = 1, NB-1, RM do
+			for [nn] = 1, NB-1, RN*V do
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				[calcc];
 				[storec];
-				A = A + (RN+2)*V 
-				C = C + (RN+2)*V
+				A = A + RN*V
+				C = C + RN*V
 			end
-			A = A + (RM+2) * ldc - NB
-			C = C + (RM+2) * ldc - NB
+			-- jump of two (final border one line, initial border next line)
+			-- It is two because the kernel is 3, it would change for different kernel
+			C = C + 2
+			A = A + 2
+
+			A = A + RM * ldc - NB
+			C = C + RM * ldc - NB
 		end
 	end
 end
@@ -150,8 +154,11 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local NB2 = NB * NBF
 
 	-- EXAMPLES
-	--local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3) 
-	local l1conv = genkernel(NB, 3, 3, 1, false, 3, 3)
+	local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3)
+	-- local l1conv = genkernel(NB, 4, 4, 1, false, 3, 3)
+
+	-- local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3) 
+	-- local l1conv = genkernel(NB, RM, RN, 1, false, 3, 3)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -170,10 +177,10 @@ end
 
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
 -- local blocksizes = {5}
-local blocksizes = {10}
+local blocksizes = {5}
 -- local blocksizes = {1024}
 -- local regblocks = {2,4,5,1}
-local regblocks = {5}
+local regblocks = {1}
 -- local regblocks = {1}
 -- local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
@@ -183,7 +190,9 @@ local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 10 -- full size of the matrix
+	local tunefor = 5 -- full size of the matrix
+	--change for 10 later
+
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
