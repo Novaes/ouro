@@ -12,7 +12,7 @@
         matrixtestharness.t: time measure in the auto-tuning process
 
     branching tags:
-        wip: working in progress
+        wip: works in progress
         junk: experiments
         bug: fixing a bug
         dev: different version or with some specific feature
