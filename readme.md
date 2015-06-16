@@ -11,5 +11,11 @@
         image.t:image library
         matrixtestharness.t: time measure in the auto-tuning process
 
-    tags for branches:
-    dev/ or wip/: working in progress; associated with a feature
+   branching tags:
+        wip: works in progress
+        junk: experiments
+        bug: fixing a bug
+        dev: different version or with some specific feature
+    
+    tags:
+      v1.0: no pointer optimization
