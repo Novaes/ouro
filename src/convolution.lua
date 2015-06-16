@@ -1,6 +1,5 @@
 local IO = terralib.includec("stdio.h")
 local stdlib = terralib.includec("stdlib.h")
-
 local number = double
 
 local function isinteger(x) return math.floor(x) == x end
@@ -31,10 +30,8 @@ end
 
 -- generate L1 convolution 
 function genkernel(NB, RM, RN, V, prefetch, K, L)
-	-- assert: no boundary cases
-	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
-	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
-	print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
+	-- assets NB/RM and NB/RN do not necessary
+	-- print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
 	local M,N = NB,NB
 	local VP = &vector(double,V)
@@ -90,14 +87,15 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
 					x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
 					--no boundary cases
-					calcc:insert(quote
-						-- if([mm] + m < NB-1 and [nn] + n < NB-1) then -- area regblocking not multiple of the area sizeblocking
-							
-							--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
-							[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
-							
-						-- end
-					end)
+					calcc:insert(
+						quote
+							-- area regblocking not multiple of the area sizeblocking
+							if([mm] + m < NB-1 and [nn] + n < NB-1) then 
+								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
+								[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
+							end
+						end
+					)
 				end
 			end
 		end
@@ -108,22 +106,30 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
 		for [mm] = 1, NB-1, RM do
-			--TODO: (NB-2)/RN*V * RN*V + 1
-			for [nn]=1, NB-1, RN*V do
+			-- how it goes by blocking, it can be greater than NB-1
+			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
+			-- however the generation of the code could not be done first, unless many ifs would be inserted  
+			for [nn]=1, NB-1, RN*V do 
 				[loadc];
 				[loadkernel];
-				-- llvmprefetch(A + sda*lda,0,3,1);
+				llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				[calcc];
 				[storec];
+				
 				A = A + RN*V
 				C = C + RN*V
 			end
-
+			if (((NB-2)/(RN*V)) * (RN*V) + 1 < NB-1) then
+				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
+				A = A - offset
+				C = C - offset
+			end
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
 			C = C + 2
 			A = A + 2
+
 			A = A + RM * ldc - NB
 			C = C + RM * ldc - NB
 		end
@@ -149,17 +155,16 @@ function blockedloop(M,N,blocksizes,bodyfn)
 end
 
 function genconvolution(NB,NBF,RM,RN,V)
-	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
-		return false
-	end
+	-- register blocking does not need to be a a multiple of the blocksize anymore
+	-- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
+		-- return false
+	-- end
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
 	local NB2 = NB * NBF
 
-	-- EXAMPLES
-	-- local l1conv = genkernel(NB, RM, RN, 1, false, 3, 3)
-	local l1conv = genkernel(NB, 1, 1, 1, false, 3, 3)
+	local l1conv = genkernel(NB, RM, RN, 1, false, 3, 3)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -168,37 +173,34 @@ function genconvolution(NB,NBF,RM,RN,V)
 			function(m,n) return quote
 			-- var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
 			l1conv(A + m*lda + n,
-	         B, -- B, fixed kernel
-	         C + m*ldc + n,
-	         sda,lda,ldb,ldc,0)
+	         	B, -- B, fixed kernel
+	         	C + m*ldc + n,
+	         	sda,lda,ldb,ldc,0)
 		end end) ]
 		-- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
 	end
 end
 
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
--- local blocksizes = {5}
 local blocksizes = {5}
 -- local blocksizes = {1024}
--- local regblocks = {2,4,5,1}
-local regblocks = {1}
--- local regblocks = {1}
--- local regblocks = {1}
+local regblocks = {1,2,3}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
+
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 5 -- full size of the matrix
+	local tunefor = 10 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
-					-- same until here
+						-- same until here
 					local my_conv = genconvolution(b,1,rm,rn,v)
 					if my_conv then
 						print(b,rm,rn,v)
@@ -207,7 +209,7 @@ if dotune then
 						local curr_gflops = 0
 						local ctyp
 						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-                        	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+	                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 						end)
 						if not correct then	print("<error>")  break  end
 						print(i,unpack (exectimes))
@@ -222,8 +224,6 @@ if dotune then
 			end
 		end
 	end
-	io.write("\nBest: ")
-	terralib.tree.printraw(best)
 end
 
 local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)

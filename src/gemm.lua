@@ -133,7 +133,7 @@ function generatedgemm(NB,NBF, RM,RN ,V)
 	end
 
 	local NB2 = NBF * NB
-	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false):printpretty()
+	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false)
 	local l1dgemm1 = genkernel(NB,RM,RN,V,1,false)
 	local l1dgemm0b = genkernel(NB,1,1,1,0,true)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
