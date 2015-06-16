@@ -114,9 +114,9 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local tocall = function() fn(M,N,K,L,A,B,C) end
 		tocall()
 		CalcTime(tocall) -- execution time
-		printMatrix(A,M,N)
-		printMatrix(B,K,L)
-		printMatrix(C,M,N)
+		-- printMatrix(A,M,N)
+		-- printMatrix(B,K,L)
+		-- printMatrix(C,M,N)
 		results[i] = CalcTime(tocall)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then
