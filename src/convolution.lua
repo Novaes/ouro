@@ -34,7 +34,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	-- assert: no boundary cases
 	-- assert(isinteger(NB / RN)) -- number of iterations over b for matrix multiplication
 	-- assert(isinteger(NB / RM)) -- number of iterations over a for matrix multiplication
-	-- print("parameters: "..NB .. " " .. RM .." ".. RN .. " " .. V .." ".. K .." ".. L)
+	print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
 	local M,N = NB,NB
 	local VP = &vector(double,V)
@@ -58,12 +58,11 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 	for m = 0, RM+1 do 
 		for n = 0, RN+1 do
 			loadA:insert(quote
-				-- mm+1 and nn+1 because I start from -1 now 
-				var [a[m][n]] = vecload(A, m*ldc + n*V)
+					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
 			if(m>=0 and m<RM and n>=0 and n<RN) then
 				loadc:insert(quote
-					var [c[m][n]] = alpha * vecload(C, (m+1)*ldc + (n+1)*V)
+						var [c[m][n]] = alpha * vecload(C, (m+1)*ldc + (n+1)*V)
 				end)
 				storec:insert(quote
 					vecstore(C, (m+1)*ldc + (n+1), [c[m][n]])
@@ -90,10 +89,14 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 				for l = 0, L-1 do
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
 					x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
-					--if x >= -1 and x<RM+1 and y>=-1 and y<RN+1 then --RM+1 and RN+1 are the image loads, no boundaries cases
+					--no boundary cases
 					calcc:insert(quote
-						--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
-						[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
+						-- if([mm] + m < NB-1 and [nn] + n < NB-1) then -- area regblocking not multiple of the area sizeblocking
+							
+							--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
+							[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
+							
+						-- end
 					end)
 				end
 			end
@@ -105,21 +108,22 @@ function genkernel(NB, RM, RN, V, prefetch, K, L)
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
 		for [mm] = 1, NB-1, RM do
-			for [nn] = 1, NB-1, RN*V do
+			--TODO: (NB-2)/RN*V * RN*V + 1
+			for [nn]=1, NB-1, RN*V do
 				[loadc];
 				[loadkernel];
-				llvmprefetch(A + sda*lda,0,3,1);
+				-- llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				[calcc];
 				[storec];
 				A = A + RN*V
 				C = C + RN*V
 			end
+
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
 			C = C + 2
 			A = A + 2
-
 			A = A + RM * ldc - NB
 			C = C + RM * ldc - NB
 		end
@@ -154,11 +158,8 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local NB2 = NB * NBF
 
 	-- EXAMPLES
-	local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3)
-	-- local l1conv = genkernel(NB, 4, 4, 1, false, 3, 3)
-
-	-- local l1conv = genkernel(NB, 3, 2, 1, false, 3, 3) 
 	-- local l1conv = genkernel(NB, RM, RN, 1, false, 3, 3)
+	local l1conv = genkernel(NB, 1, 1, 1, false, 3, 3)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -192,7 +193,6 @@ if dotune then
 	-- local tunefor = 1024
 	local tunefor = 5 -- full size of the matrix
 	--change for 10 later
-
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
 		for _,rm in ipairs(regblocks) do
