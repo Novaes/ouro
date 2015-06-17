@@ -182,7 +182,6 @@ function genconvolution(NB,NBF,RM,RN,V)
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
-        var thread : MT.pthread_t
         var args = arrayof(int,0)
          [ blockedloop(N,M,{NB2,NB},
                 function(m,n) 
