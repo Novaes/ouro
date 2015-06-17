@@ -1,5 +1,4 @@
 local IO = terralib.includec("stdio.h")
-local MT = terralib.includec("pthread.h")
 local stdlib = terralib.includec("stdlib.h")
 local number = double
 
@@ -176,7 +175,7 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local NB2 = NB * NBF
 
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
-	-- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+	local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
 
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
@@ -191,41 +190,19 @@ function genconvolution(NB,NBF,RM,RN,V)
                     var MM,NN = min(M-m,NB),min(N-n,NB)
                     var isboundary = MM < NB or NN < NB
                     var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                    -- if isboundary then -- do not enter here YET
-                    --  l1conv0b(AA,
-                    --      B,
-                    --      CC,
-                    --      sda,lda,ldb,ldc,0,MM,NN)
-                    -- else
+                    if isboundary then -- do not enter here YET
+                     l1conv0b(AA,
+                         B,
+                         CC,
+                         sda,lda,ldb,ldc,0,MM,NN)
+                    else
                         l1conv0(AA,
                          B,
                          CC,
-                         sda,lda,ldb,ldc,0)
-                    -- end
-                end end) 
+                         sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+                    end
+                end end)  
             ]       
-  --       var fn = [ blockedloop(N,M,{NB2,NB},
-  --               function(m,n) 
-  --               return quote
-  --                   var MM,NN = min(M-m,NB),min(N-n,NB)
-  --                   var isboundary = MM < NB or NN < NB
-  --                   var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-  --                   -- if isboundary then -- do not enter here YET
-  --                   --  l1conv0b(AA,
-  --                   --      B,
-  --                   --      CC,
-  --                   --      sda,lda,ldb,ldc,0,MM,NN)
-  --                   -- else
-  --                       l1conv0(AA,
-  --                        B,
-  --                        CC,
-  --                        sda,lda,ldb,ldc,0)
-  --                   -- end
-  --               end end) 
-  --           ]
-		-- MT.pthread_create(&thread,nil, fn
-  --           ,&args[0])
-		-- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
 	end
 end
 
