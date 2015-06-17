@@ -229,7 +229,7 @@ terra Image:convolve(ker: Filter)
           end
         end
       end)] 
-  end
+  end 
   backToImage(data,self.channels,self.width,self.height,Rout,Gout,Bout)
   free(r,b,g,Rout,Gout,Bout)
 end
@@ -252,7 +252,7 @@ terra Image:convolvetuned(ker: Filter)
   var Rout: &double, Gout: &double, Bout: &double = memDoubleRGB(self.width,self.height)
 
   --ker:print()
-
+  
   for p=0,self.channels do
     if p == 0 then
       img = r

@@ -49,23 +49,24 @@ end
 -- create a 1-9 with 0 padding border, used for test convolution
 function fillpart(A,sM,eM,sN,eN,M,N) 
 	local counter = 0
+	local dim = eN-sN + 1
+	local elems = dim * dim
 	for m = sM, eM do 
 		for n = sN, eN do
-			if( n == 0 or m == 0 or m == M-1 or n == N-1 ) then
-				A[m*N + n] = 0
-			else
-				A[m*N + n] = counter + 1
-				counter = (counter + 1) % 9
-			end
+			A[m*N + n] = counter + 1
+			counter = (counter + 1) % elems
 		end
 	end
 end
 
-function generateA(A, M, N)
-	fillpart(A,0,(M-4)/2,0,(N-4)/2,M,N)
-	fillpart(A,0,(M-4)/2,(M-4)/2 + (N-4)/2,N-1,M,N)
-	fillpart(A,(M-4)/2 + (M-4)/2,M-1,0,(N-4)/2,M,N)
-	fillpart(A,(M-4)/2 + (M-4)/2,M-1,(N-4)/2 + (N-4)/2,N-1,M,N)
+function generateA(A, M, N, inX, inY)
+	local nRows = M/inX - 1 -- first matrix start from 0
+	local nCols = N/inY - 1
+	for j=0,nRows do
+		for i = 0,nCols do
+			fillpart(A, 1 + j*inY, (inY-2) + j*inY, 1 + i*inX, (inX-2) + i*inX, M, N)
+		end
+	end
 end
 
 function MTH.timefunctions(typstring,M,N,K,L,...)
@@ -74,12 +75,25 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	local B = ffi.new(ctyp,K*L)
 
 	--specific example A
-	generateA(A, M, N)
+	generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
+	printMatrix(A,M,N)
+
+	-- specific examples B
+	if K == 3 then
+		B[0] = 1; B[1] = 2; B[2] = 1;
+		B[3] = 0; B[4] = 0; B[5] = 0;
+		B[6] = -1;B[7] =-2; B[8] = -1;
+	end
+	if K == 5  then
+		B[0] = 1; B[1] = 4; B[2] = 7; B[3] = 4; B[4] = 1;
+		B[5] = 4; B[6] = 16; B[7] = 26; B[8] = 16; B[9] = 4;
+		B[10] = 7; B[11] = 26; B[12] = 41; B[13] = 26; B[14] = 7;
+		B[15] = 4; B[16] = 16; B[17] = 26; B[18] = 16; B[19] = 4;
+		B[20] = 1; B[21] = 4; B[22] = 7; B[23] = 4; B[24] = 1;
+	end
+	printMatrix(B,K,L)
 	
-	-- specific example B
-	B[0] = 1; B[1] = 2; B[2] = 1;
-	B[3] = 0; B[4] = 0; B[5] = 0;
-	B[6] = -1;B[7] =-2; B[8] = -1;
+	
 
 	-- randomizer A
 	-- for m = 0, M-1 do

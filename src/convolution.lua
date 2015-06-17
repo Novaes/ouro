@@ -1,6 +1,8 @@
 local IO = terralib.includec("stdio.h")
+local MT = terralib.includec("pthread.h")
 local stdlib = terralib.includec("stdlib.h")
 local number = double
+
 
 local function isinteger(x) return math.floor(x) == x end
 local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
@@ -61,7 +63,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 
-	for m = 0, RM+1 do 
+	for m = 0, RM+1 do
 		for n = 0, RN+1 do
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
@@ -124,7 +126,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				[loadA];
 				[calcc];
 				[storec];
-				
 				A = A + RN*V
 				C = C + RN*V
 			end
@@ -170,38 +171,66 @@ function genconvolution(NB,NBF,RM,RN,V)
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
+
+
 	local NB2 = NB * NBF
 
-	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
-	local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
+	-- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
-		[ blockedloop(N,M,{NB2,NB},function(m,n) 
-			return quote
-				var MM,NN = min(M-m,NB),min(N-n,NB)
-				var isboundary = MM < NB or NN < NB
-				var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-				if isboundary then -- do not enter here YET
-					l1conv0b(AA,
-			         B,
-			         CC,
-			         sda,lda,ldb,ldc,0,MM,NN)
-				else
-					l1conv0(AA,
-			         B,
-			         CC,
-			         sda,lda,ldb,ldc,0)
-				end
-			end end) ]
+        var thread : MT.pthread_t
+        var args = arrayof(int,0)
+         [ blockedloop(N,M,{NB2,NB},
+                function(m,n) 
+                return quote
+                    var MM,NN = min(M-m,NB),min(N-n,NB)
+                    var isboundary = MM < NB or NN < NB
+                    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+                    -- if isboundary then -- do not enter here YET
+                    --  l1conv0b(AA,
+                    --      B,
+                    --      CC,
+                    --      sda,lda,ldb,ldc,0,MM,NN)
+                    -- else
+                        l1conv0(AA,
+                         B,
+                         CC,
+                         sda,lda,ldb,ldc,0)
+                    -- end
+                end end) 
+            ]       
+  --       var fn = [ blockedloop(N,M,{NB2,NB},
+  --               function(m,n) 
+  --               return quote
+  --                   var MM,NN = min(M-m,NB),min(N-n,NB)
+  --                   var isboundary = MM < NB or NN < NB
+  --                   var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+  --                   -- if isboundary then -- do not enter here YET
+  --                   --  l1conv0b(AA,
+  --                   --      B,
+  --                   --      CC,
+  --                   --      sda,lda,ldb,ldc,0,MM,NN)
+  --                   -- else
+  --                       l1conv0(AA,
+  --                        B,
+  --                        CC,
+  --                        sda,lda,ldb,ldc,0)
+  --                   -- end
+  --               end end) 
+  --           ]
+		-- MT.pthread_create(&thread,nil, fn
+  --           ,&args[0])
 		-- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
 	end
 end
 
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
-local blocksizes = {5}
+local blocksizes = {5,10}
 -- local blocksizes = {1024}
 local regblocks = {1,2,3}
 -- local vectors = {1,2,4,8,16}
@@ -212,7 +241,7 @@ local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 10 -- full size of the matrix
+	local tunefor = 20 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
