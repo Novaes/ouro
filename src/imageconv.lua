@@ -317,9 +317,7 @@ terra Package:getKernel()
 end
 
 terra conv(args : &opaque) : &opaque
-  var f : &Package
- = [&Package
-  ](args)
+  var f : &Package = [&Package](args)
   var kernel : Filter = (@f).filter
   (@f).image:convolve(kernel)
   return nil
