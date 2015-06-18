@@ -19,7 +19,7 @@ terra nowNs()
   return C.nowNs()
 end
 
-terra runBenchmark(fn : {} -> {})
+terra runBenchmark(fn : {&opaque} -> &opaque, arg : &opaque)
   var maxIter : int = 5
   var maxTime : int = 1000000000 -- 1 second
 
@@ -29,7 +29,7 @@ terra runBenchmark(fn : {} -> {})
   var totalTime : uint64 = 0
   while i < maxIter and totalTime < maxTime do
     var start : uint64 = nowNs()
-    fn()
+    fn(arg)
     var elapsed : uint64 = nowNs() - start
 
     -- insert in order - no sort in terra :(
@@ -61,14 +61,16 @@ terra runBenchmark(fn : {} -> {})
   return times(p50)
 end
 
---[[ -- EXAMPLE
-terra testing()
-  print("Hi")
-  -- nowNs()
+ -- EXAMPLE
+--[[
+terra testing(p : &opaque) : &opaque
+  print(p) -- example of a function
+  nowNs()
+  return nil
 end
 
 terra main()
-  print(runBenchmark(testing))
+  print(runBenchmark(testing, nil))
 end
 
 main()

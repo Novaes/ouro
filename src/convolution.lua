@@ -129,6 +129,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				A = A + RN*V
 				C = C + RN*V
 			end
+			-- adjust when regblocking is not multiple of blocksize
 			if (((NB-2)/(RN*V)) * (RN*V) + 1 < NB-1) then
 				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
 				A = A - offset
@@ -163,6 +164,10 @@ function blockedloop(M,N,blocksizes,bodyfn)
   return generatelevel(1,0,0,M,N)
 end
 
+terra forkedFn(args : &opaque) : &opaque
+	return nil
+end
+
 function genconvolution(NB,NBF,RM,RN,V)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
 	-- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
@@ -178,53 +183,57 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
 	-- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
 
-
+	-- terra forkedFn():&quote
+	-- 	l1conv0(AA,B,CC,sda,lda,ldb,ldc,0)
+	-- 	return nil
+	-- end
+	terra forkedFn(argc: &opaque):&opaque
+	
+	end
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
         var thread : MT.pthread_t
-        var args = arrayof(int,0)
+        var args = arrayof(int,1)
+         -- [ blockedloop(N,M,{NB2,NB},
+         --        function(m,n) 
+         --        return quote
+         --            var MM,NN = min(M-m,NB),min(N-n,NB)
+         --            var isboundary = MM < NB or NN < NB
+         --            var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+         --            -- if isboundary then -- do not enter here YET
+         --            --  l1conv0b(AA,
+         --            --      B,
+         --            --      CC,
+         --            --      sda,lda,ldb,ldc,0,MM,NN)
+         --            -- else
+         --                l1conv0(AA,
+         --                 B,
+         --                 CC,
+         --                 sda,lda,ldb,ldc,0)
+         --            -- end
+         --        end end) 
+         --    ]       
          [ blockedloop(N,M,{NB2,NB},
-                function(m,n) 
-                return quote
-                    var MM,NN = min(M-m,NB),min(N-n,NB)
-                    var isboundary = MM < NB or NN < NB
-                    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                    -- if isboundary then -- do not enter here YET
-                    --  l1conv0b(AA,
-                    --      B,
-                    --      CC,
-                    --      sda,lda,ldb,ldc,0,MM,NN)
-                    -- else
-                        l1conv0(AA,
-                         B,
-                         CC,
-                         sda,lda,ldb,ldc,0)
-                    -- end
-                end end) 
-            ]       
-  --       var fn = [ blockedloop(N,M,{NB2,NB},
-  --               function(m,n) 
-  --               return quote
-  --                   var MM,NN = min(M-m,NB),min(N-n,NB)
-  --                   var isboundary = MM < NB or NN < NB
-  --                   var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-  --                   -- if isboundary then -- do not enter here YET
-  --                   --  l1conv0b(AA,
-  --                   --      B,
-  --                   --      CC,
-  --                   --      sda,lda,ldb,ldc,0,MM,NN)
-  --                   -- else
-  --                       l1conv0(AA,
-  --                        B,
-  --                        CC,
-  --                        sda,lda,ldb,ldc,0)
-  --                   -- end
-  --               end end) 
-  --           ]
-		-- MT.pthread_create(&thread,nil, fn
-  --           ,&args[0])
+	        function(m,n)
+	        return quote
+	            var MM,NN = min(M-m,NB),min(N-n,NB)
+	            var isboundary = MM < NB or NN < NB
+	            var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+	            -- if isboundary then -- do not enter here YET
+	            --  l1conv0b(AA,
+	            --      B,
+	            --      CC,
+	            --      sda,lda,ldb,ldc,0,MM,NN)
+	            -- else
+	                l1conv0(AA,
+	               B,
+	               CC,
+	               sda,lda,ldb,ldc,0)
+	            -- end
+        end end) ]
+		MT.pthread_create(&thread, nil, forkedFn , &args[0])
 		-- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
 	end
 end

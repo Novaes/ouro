@@ -298,14 +298,37 @@ terra Filter:load()
   return self:init(width,height,width,divisor,false,weights)
 end
 
+struct Package {
+    image : Image;
+    filter : Filter;
+}
 
-terra conv(inp: Image,ker: Filter)
-  inp:convolve(ker)
+terra Package:init(img : Image, ker: Filter)
+    self.image = img
+    self.filter = ker
+end
+
+terra Package:getImage()
+    return self.image
+end
+
+terra Package:getKernel()
+    return self.kernel
+end
+
+terra conv(args : &opaque) : &opaque
+  var f : &Package
+ = [&Package
+  ](args)
+  var kernel : Filter = (@f).filter
+  (@f).image:convolve(kernel)
+  return nil
 end
 
 terra naive(inp : Image, ker : Filter)
   inp:naiveconv(ker)
 end
+
 
 local terra loadAndRun(argc: int, argv: &rawstring)
   -- loading image
@@ -319,7 +342,11 @@ local terra loadAndRun(argc: int, argv: &rawstring)
   -- convolve
   ker:flip()
 
-  inp:convolve(ker)
+  var f : Package
+  f:init(inp,ker)
+
+  print(runBenchmark(conv, &f))
+  
   -- inp:naiveconv(ker)
   
   var out: Image
