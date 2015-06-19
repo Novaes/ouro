@@ -32,7 +32,7 @@ end
 
 -- generate L1 convolution 
 function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
-    local M,N, boundaryargs
+    local M,N--[[, boundaryargs
     -- if one of the parameters is lower than NB then receive the usual
     if boundary then 
         M,N = symbol(int64,"M"),symbol(int64,"N")
@@ -41,7 +41,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
         boundaryargs = terralib.newlist()
         M,N = NB,NB
     end
-
+]]
     -- assets NB/RM and NB/RN do not necessary
     -- print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
@@ -112,7 +112,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
         end
     end
 
-    return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
+    return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double--[[, [boundaryargs] ]])
         -- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
         -- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
         for [mm] = 1, NB-1, RM do
@@ -170,13 +170,9 @@ end
 
 struct L1Package{
     NB: int
-    NB2: int
-    gettime : {} -> double
+    l1conv0 : {&double, &double, &double, int, int, int, int, double} -> {}
     M : int
     N : int
-    K : int
-    L: int
-    alpha : double
     A : &double
     sda: int
     lda : int
@@ -184,21 +180,18 @@ struct L1Package{
     ldb : int
     C : &double
     ldc : int
-    kCenterX: int
-    kCenterY: int
+    m : int
+    n : int
 }
 
-terra L1Package:init(NB: int, NB2: int, gettime : {} -> double, M : int, N : int, K : int, L: int, 
-        alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
-        ldc : int, kCenterX: int, kCenterY: int)
+terra L1Package:init(NB: int, l1conv0 : {&double, &double, &double, int, int, int, int, double} -> {},  
+        M : int, N : int, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+        ldc : int, m: int, n: int)
+    
     self.NB = NB
-    self.NB2 = NB2
-    self.gettime = gettime
+    self.l1conv0 = l1conv0
     self.M = M
     self.N = N
-    self.K = K
-    self.L = L
-    self.alpha = alpha
     self.A = A
     self.sda = sda
     self.lda = lda
@@ -206,21 +199,17 @@ terra L1Package:init(NB: int, NB2: int, gettime : {} -> double, M : int, N : int
     self.ldb = ldb
     self.C = C
     self.ldc = ldc
-    self.kCenterX = kCenterX
-    self.kCenterY = kCenterY
-
+    self.m = m
+    self.n = n
 end
 
-terra l1MTComputation(args: &opaque):&opaque
+terra l1MTComputation(args: &opaque) : &opaque
     var f : &L1Package = [&L1Package](args)
-    var NB = (@f).NB
-    var NB2 = (@f).NB2
-    var gettime : {} -> double = (@f).gettime
+    -- check received args problem
+    var NB : int = (@f).NB
+    var l1conv0 : {&double,&double,&double, int, int, int, int, double} -> {} = (@f).l1conv0
     var M : int = (@f).M
     var N : int = (@f).N
-    var K : int = (@f).K
-    var L: int = (@f).L
-    var alpha : double = (@f).alpha
     var A : &double = (@f).A
     var sda: int = (@f).sda
     var lda : int = (@f).lda
@@ -228,61 +217,80 @@ terra l1MTComputation(args: &opaque):&opaque
     var ldb : int = (@f).ldb
     var C : &double = (@f).C
     var ldc : int = (@f).ldc
-    var kCenterX: int = (@f).kCenterX
-    var kCenterY: int = (@f).kCenterY
+    var m : int = (@f).m
+    var n : int = (@f).n
 
-    [ blockedloop(N,M,{NB2,NB},
-            function(m,n)
-            return quote
-                var MM,NN = min(M-m,NB),min(N-n,NB)
-                var isboundary = MM < NB or NN < NB
-                var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                    l1conv0(AA,
-                    B,
-                    CC,
-                    sda,lda,ldb,ldc,0)
-        end end) ]
+    -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",NB,NB2,M,N,K,L,sda,lda,ldb,ldc,kCenterX,kCenterY)
+    -- IO.printf("M: %d\n",M)
+
+    --compute l1sized kernel
+    var MM,NN = min(M-m,NB),min(N-n,NB)
+    var isboundary = MM < NB or NN < NB
+    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+                
+    l1conv0(AA,
+    B,
+    CC,
+    sda,lda,ldb,ldc,0)
+
     return nil
 end
 
 function genconvolution(NB,NBF,RM,RN,V)
     -- register blocking does not need to be a a multiple of the blocksize anymore
     -- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
-        -- return false
+    -- return false
     -- end
 
     --5 times NB minimum by dgemm
     --local NB2 = NBF * NB
 
     local NB2 = NB * NBF
-    local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
+
+    -- no prefetch, no boundary
+    
+    local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
     -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+    
+    local thrSIZE =  NB*NB
 
     return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
         alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
         
-        var thread : MT.pthread_t
-        var pkg : L1Package
-        L1Package:init(NB,NB2,gettime, M, N, K, L, alpha, A, sda, lda, B, ldb, C, ldc, kCenter, kCenter)
-        MT.pthread_create(&thread, nil, l1MTComputation , &pkg)
+        var threads : MT.pthread_t[thrSIZE]
+        var count = 0
+        -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
+        [ blockedloop(N,M,{NB2,NB},
+                function(m,n)
+                return quote
+                    var pkg : L1Package
+                    pkg:init(NB, l1conv0, M, N, A, sda, lda, B, ldb, C, ldc, m, n)
+                    MT.pthread_create(&(threads[count]), nil, l1MTComputation , &pkg)
+                    count = count + 1
+        end end) ]
+
+        -- list
+        [ blockedloop(N,M,{NB2,NB},
+                function(m,n)
+                    return quote
+                    MT.pthread_join(threads[count],nil)
+                    count = count - 1
+        end end) ]    
+            
         -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
     end
 end
 
--- local blocksizes = {16,24,32,40,48,56,64,1024}
-local blocksizes = {5,10}
--- local blocksizes = {1024}
-local regblocks = {1,2,3}
--- local vectors = {1,2,4,8,16}
-local vectors = {1}
+local blocksizes = {5,--[[10 ,16,24,32,40,48,56,64,1024]]}
+local regblocks = {1, --[[2,3]]}
+local vectors = {1 --[[,2,4,8,16]]}
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
-    -- local tunefor = 1024
-    local tunefor = 20 -- full size of the matrix
+    local tunefor = 20 --[[1024]] -- full size of the matrix
     --change for 10 later
     local harness = require("lib/matrixtestharness")
     for _,b in ipairs(blocksizes) do
@@ -298,7 +306,8 @@ if dotune then
                         local curr_gflops = 0
                         local ctyp
                         local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+                            -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) 
                         end)
                         if not correct then print("<error>")  break  end
                         print(i,unpack (exectimes))

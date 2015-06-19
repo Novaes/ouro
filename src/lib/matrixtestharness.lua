@@ -130,7 +130,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		CalcTime(tocall) -- execution time
 		-- printMatrix(A,M,N)
 		-- printMatrix(B,K,L)
-		-- printMatrix(C,M,N)
+		printMatrix(C,M,N)
 		results[i] = CalcTime(tocall)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then
