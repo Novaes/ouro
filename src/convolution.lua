@@ -100,7 +100,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-							if([mm] + m < NB-1 and [nn] + n < NB-1) then 
+							if([mm] + m < NB-1 and [nn] + n < NB-1) then
 								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
 								[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
 							end
@@ -205,9 +205,9 @@ function genconvolution(NB,NBF,RM,RN,V)
 	end
 end
 
--- local blocksizes = {16,24,32,40,48,56,64,1024}
-local blocksizes = {5,10}
--- local blocksizes = {1024}
+-- Different blocksizes for the same result implies in padding overheading 
+-- for small blocks
+local blocksizes = {5,10--[[16,24,32,40,48,56,64,1024]]}
 local regblocks = {1,2,3}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
