@@ -29,6 +29,16 @@ function printMatrix(m,rows,columns)
   io.write("\n")
 end
 
+terra extractsum(ref : &opaque, V: int) -- todo change argument to V
+	-- var vecref : &vector(double,V) = [&vector(double,V)](ref)
+	-- var vec : vector(double,V) = @vecref
+	-- var sum : int = 0
+	-- for i=0,V do
+	-- 	sum = sum + vec(i)
+	-- end
+	-- IO.printf("%d",sum)
+end
+
 -- generate L1 convolution 
 function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local M,N, boundaryargs
@@ -57,24 +67,31 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
 	local sda,lda,ldb,ldc = symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
-	local a,b,c = symmat("a",RM+2,RN+2), symmat("b",K,L), symmat("c",RM,RN)
+	local a,b,c = symmat("a",RM+2,RN+2), symmat("b",K,L/V), symmat("c",RM,RN)
 	local kk, ll = symbol("kk"), symbol("ll")
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
+	local temp_storeA = terralib.newlist() --todo remove
 
-	for m = 0, RM+1 do
-		for n = 0, RN+1 do
-			loadA:insert(quote
-					var [a[m][n]] = vecload(A, m*ldc + n*V)
-			end)
-			if(m>=0 and m<RM and n>=0 and n<RN) then
-				loadc:insert(quote
-						var [c[m][n]] = alpha * vecload(C, (m+1)*ldc + (n+1)*V)
-				end)
-				storec:insert(quote
-					vecstore(C, (m+1)*ldc + (n+1), [c[m][n]])
-				end)
-			end
+    for m = 0, RM+1 do
+        for n = 0, RN-1 do --todo remove RN+1
+            loadA:insert(quote
+                var [a[m][n]] = vecload(A, m*ldc + n*V) -- it is not n*V
+            end)
+        end
+    end
+
+	for m = 0, RM-1 do
+		for n = 0, RN-1 do
+            loadc:insert(quote
+                var [c[m][n]] = alpha * C[(m+1)*ldc + (n+1)]
+            end)
+            storec:insert(quote
+                C[(m+1)*ldc + (n+1)] = [c[m][n]]
+            end)
+             temp_storeA:insert(quote
+				vecstore(A, m*ldc + n*V,[a[m][n]])
+            end)
 		end
 	end
 
@@ -82,7 +99,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 
 	-- load full kernel
 	for  k=0, K-1 do
-		for l = 0, L-1 do
+		for l = 0, L/V - 1 do
 			loadkernel:insert(quote
 				var [b[k][l]] = vecload(B, k*ldb + l*V)
 			end)
@@ -93,17 +110,23 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
 			for k=0, K-1 do
-				for l = 0, L-1 do
+				for l = 0, L/V-1 do
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
 					x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
 					--no boundary cases
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-							if([mm] + m < NB-1 and [nn] + n < NB-1) then
-								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
-								[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
-							end
+							-- if([mm] + m < NB-1 and [nn] + n < NB-1) then
+								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] means take a[-1][-1] necessary for c[0][0]
+								-- because for each block (0,0) means (1,1) for example
+
+								-- do a function that takes this return &{vector(double,3)} -> {} and set the 
+								-- print([a[x+1][y+1]] * [b[k][l]])
+								[a[x+1][y+1]] = [a[x+1][y+1]] * [b[k][l]]
+								-- extractsum(&([vector(double,V)]([a[x+1][y+1]]) * [b[k][l]]),V)
+								-- [c[m][n]] = [c[m][n]] + extractsum([r[m][n]])
+							-- end
 						end
 					)
 				end
@@ -111,7 +134,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 		end
 	end
 
-	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
+	return terra([A] : &double, [B] : &double, [C] : &double, --[[[T] : &double]] [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
 		for [mm] = 1, NB-1, RM do
@@ -119,20 +142,36 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
 			-- however the generation of the code could not be done first, unless many ifs would be inserted  
 			for [nn]=1, NB-1, RN*V do 
+				-- IO.printf("loading C...\n")
 				[loadc];
+				-- IO.printf("load C done\n")
+                -- IO.printf("loading B...\n")
 				[loadkernel];
-				llvmprefetch(A + sda*lda,0,3,1);
+				-- IO.printf("load B done\n")
+				-- IO.printf("loading A...\n")
+				-- llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
+				-- IO.printf("loading A done\n")
+				-- IO.printf("calculating C\n")
 				[calcc];
+				-- IO.printf("calculating C done\n")
+				-- IO.printf("storing C back\n")
 				[storec];
+				if [nn] == 1 then 
+					vecstore(A, 0, [a[0][0]])
+				end
+				-- vecstore(A, 5, [a[1][0]])
+				-- vecstore(A, 10, [a[2][0]])
+				-- [temp_storeA];
+				-- IO.printf("storing C back done\n")
 				A = A + RN*V
 				C = C + RN*V
 			end
-			if (((NB-2)/(RN*V)) * (RN*V) + 1 < NB-1) then
-				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
-				A = A - offset
-				C = C - offset
-			end
+			-- if ( ((NB-2)/(RN*V)) * RN*V + 1 < NB-1) then
+			-- 	var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
+			-- 	A = A - offset
+			-- 	C = C - offset
+			-- end
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
 			C = C + 2
@@ -162,44 +201,44 @@ function blockedloop(M,N,blocksizes,bodyfn)
   return generatelevel(1,0,0,M,N)
 end
 
-function genconvolution(NB,NBF,RM,RN,V)
+function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
-	-- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
-		-- return false
-	-- end
+    -- temporary needed for vector instruction
+	if not isinteger((NB-2)/(RN*V)) or not isinteger((NB-2)/RM) then
+		return false
+	end
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
 
-
 	local NB2 = NB * NBF
 
-	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
-	local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+	-- no prefetch, no boundary
+	local l1conv0 = genkernel(NB, RM, RN, V, false, K, L, false):printpretty()
+	local l1conv0b = genkernel(NB, RM, RN, V, false, K, L, true)
 
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
-        var args = arrayof(int,0)
          [ blockedloop(N,M,{NB2,NB},
                 function(m,n) 
                 return quote
                     var MM,NN = min(M-m,NB),min(N-n,NB)
                     var isboundary = MM < NB or NN < NB
                     var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                    if isboundary then -- do not enter here YET
-                     l1conv0b(AA,
-                         B,
-                         CC,
-                         sda,lda,ldb,ldc,0,MM,NN)
-                    else
-                        l1conv0(AA,
-                         B,
-                         CC,
-                         sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
-                    end
+                    -- if isboundary then -- do not enter here YET
+                    --  l1conv0b(AA,
+                    --      B,
+                    --      CC,
+                    --      sda,lda,ldb,ldc,0,MM,NN)
+                    -- else
+	                    l1conv0(AA,
+	                     B,
+	                     CC,
+	                     sda,lda,ldb,ldc,0) -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+                    -- end
                 end end)  
             ]       
 	end
@@ -207,25 +246,26 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {5,10--[[16,24,32,40,48,56,64,1024]]}
-local regblocks = {1,2,3}
+local blocksizes = {5,--[[10,16,24,32,40,48,56,64,1024]]}
+local regblocksM = {1}
+local regblocksN = {1}
 -- local vectors = {1,2,4,8,16}
-local vectors = {1}
+local vectors = {3}
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 20 -- full size of the matrix
+	local tunefor = 10 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
-		for _,rm in ipairs(regblocks) do
-			for _,rn in ipairs(regblocks) do
+		for _,rm in ipairs(regblocksM) do
+			for _,rn in ipairs(regblocksN) do
 				for _,v in ipairs(vectors) do
 						-- same until here
-					local my_conv = genconvolution(b,1,rm,rn,v)
+					local my_conv = genconvolution(b,1,rm,rn,v,3,3)
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
@@ -250,5 +290,5 @@ if dotune then
 	end
 end
 
-local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
+local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v,3,3)
 terralib.saveobj("my_conv.o", {my_convolution = my_convolution})

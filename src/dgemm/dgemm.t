@@ -24,7 +24,6 @@ function symmat(name,I,...)
 	return r
 end
 
-
 function genl1matmul(NB, NK, RM, RN, V, prefetch)
 	assert(isinteger(NB / (RN*V)))
 	assert(isinteger(NB / RM))

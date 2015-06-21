@@ -93,8 +93,6 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	end
 	-- printMatrix(B,K,L)
 	
-	
-
 	-- randomizer A
 	-- for m = 0, M-1 do
 	-- 	for n = 0, N-1 do
@@ -117,7 +115,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local C = ffi.new(ctyp,M*N)
 		for j = 0, M * N - 1 do 
 			C[j] = 0
-		end	
+			end	
 		Cs[i] = C
 	end
 
@@ -128,7 +126,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local tocall = function() fn(M,N,K,L,A,B,C) end
 		tocall()
 		CalcTime(tocall) -- execution time
-		-- printMatrix(A,M,N)
+		printMatrix(A,M,N)
 		-- printMatrix(B,K,L)
 		printMatrix(C,M,N)
 		results[i] = CalcTime(tocall)

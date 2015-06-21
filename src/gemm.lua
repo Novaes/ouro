@@ -22,14 +22,13 @@ local function unalignedstore(addr,v)
 	return `terralib.attrstore(addr,v, { align = alignment })
 end
 
-
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
 
 function genkernel(NB, RM, RN, V, alpha, boundary)
 	local M,N,K, boundaryargs
 
 	-- if one of the parameters is lower than NB then receive the usual
-	if boundary then 
+	if boundary then
 		M,N,K = symbol(int64,"M"),symbol(int64,"N"),symbol(int64,"K")
 		boundaryargs = terralib.newlist({M,N,K})
 	else
@@ -46,12 +45,11 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 	local VT = vector(number,V)
 	local VP = &VT
 	
-
 	-- it will take V elements at one c position
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
 			--alpha C mult, load C to fast memory (register vector), multiply it by alpha
-			loadc:insert(quote	
+			loadc:insert(quote
 				var [caddr[m][n]] = C + m*ldc + n*V
 				var [c[m][n]] = alpha * unalignedload(VP([caddr[m][n]]))
 			end)
@@ -81,7 +79,7 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 			end)
 		end
 	end
-	
+
 	local result = terra([A] : &number, [B] : &number, [C] : &number, [lda] : int64,[ldb] : int64,[ldc] : int64,[boundaryargs])
 		for [mm] = 0, M, RM do
 			for [nn] = 0, N,RN*V do
@@ -141,28 +139,28 @@ function generatedgemm(NB,NBF, RM,RN ,V)
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		           beta : number, C : &number, ldc : int)
 		[ blockedloop(N,M,K,{NB2,NB},function(m,n,k) return quote
-								var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
-								var isboundary = MM < NB or NN < NB or KK < NB
-								var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
-								if k == 0 then
-									if isboundary then
-										--IO.printf("b0 %d %d %d\n",MM,NN,KK)
-										l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
-										--IO.printf("be %d %d %d\n",MM,NN,KK)
-									else
-										l1dgemm0(AA,BB,CC,lda,ldb,ldc)
-									end
-								else
-									if isboundary then
+			var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
+			var isboundary = MM < NB or NN < NB or KK < NB
+			var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
+			if k == 0 then
+				if isboundary then
+					--IO.printf("b0 %d %d %d\n",MM,NN,KK)
+					l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
+					--IO.printf("be %d %d %d\n",MM,NN,KK)
+				else
+					l1dgemm0(AA,BB,CC,lda,ldb,ldc)
+				end
+			else
+				if isboundary then
 
-										--IO.printf("b %d %d %d\n",MM,NN,KK)
-										l1dgemm1b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
+					--IO.printf("b %d %d %d\n",MM,NN,KK)
+					l1dgemm1b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
 
-										--IO.printf("be %d %d %d\n",MM,NN,KK)
-									else
-										l1dgemm1(AA,BB,CC,lda,ldb,ldc)
-									end
-								end
+					--IO.printf("be %d %d %d\n",MM,NN,KK)
+				else
+					l1dgemm1(AA,BB,CC,lda,ldb,ldc)
+				end
+			end
 		end end) ]
 	end
 end
