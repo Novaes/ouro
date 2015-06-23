@@ -76,7 +76,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 
 	--specific example A
 	generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
-	printMatrix(A,M,N)
+	-- printMatrix(A,M,N)
 
 	-- specific examples B
 	if K == 3 then
@@ -91,7 +91,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		B[15] = 4; B[16] = 16; B[17] = 26; B[18] = 16; B[19] = 4;
 		B[20] = 1; B[21] = 4; B[22] = 7; B[23] = 4; B[24] = 1;
 	end
-	printMatrix(B,K,L)
+	-- printMatrix(B,K,L)
 	
 	
 
@@ -130,7 +130,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		CalcTime(tocall) -- execution time
 		-- printMatrix(A,M,N)
 		-- printMatrix(B,K,L)
-		printMatrix(C,M,N)
+		-- printMatrix(C,M,N)
 		results[i] = CalcTime(tocall)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then

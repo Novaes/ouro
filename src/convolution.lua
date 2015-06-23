@@ -242,7 +242,7 @@ terra l1MTComputation(args: &opaque) : &opaque
     return nil
 end
 
-function genconvolution(NB,NBF,RM,RN,V)
+function genconvolution(NB,NBF,RM,RN,V,NT)
     -- register blocking does not need to be a a multiple of the blocksize anymore
     -- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
     -- return false
@@ -258,15 +258,13 @@ function genconvolution(NB,NBF,RM,RN,V)
     local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
     -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
     
-    local thrSIZE =  NB*NB
+    local thrSIZE =  NT
 
     return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
         alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
-        
-        var thpool : POOL.threadpool = POOL.thpool_init(2)
-        -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
-
+        var thpool : POOL.threadpool = POOL.thpool_init(thrSIZE)
+    
         [ blockedloop(N,M,{NB2,NB},
                 function(m,n)
                 return quote
@@ -282,47 +280,50 @@ function genconvolution(NB,NBF,RM,RN,V)
     end
 end
 
-local blocksizes = {5,--[[10 ,16,24,32,40,48,56,64,1024]]}
-local regblocks = {1, --[[2,3]]}
+local blocksizes = {20--[[10 ,16,24,32,40,48,56,64,1024]]}
+local regblocks = {1,2,3 --[[2,3]]}
 local vectors = {1 --[[,2,4,8,16]]}
+local threads = {1,3,4,6, --[[,2,4,8,16]]}
 
 -- initialized (defined structure of best)
-local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
+local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, t = 4}
 
 if dotune then
-    local tunefor = 20 --[[1024]] -- full size of the matrix
+    local tunefor = 1000 --[[1024]] -- full size of the matrix
     --change for 10 later
     local harness = require("lib/matrixtestharness")
     for _,b in ipairs(blocksizes) do
         for _,rm in ipairs(regblocks) do
             for _,rn in ipairs(regblocks) do
-                for _,v in ipairs(vectors) do
-                        -- same until here
-                    local my_conv = genconvolution(b,1,rm,rn,v)
-                    if my_conv then
-                        print(b,rm,rn,v)
-                        my_conv:compile()
-                        local i = math.floor(tunefor / b) * b
-                        local curr_gflops = 0
-                        local ctyp
-                        local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-                            -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) 
-                        end)
-                        if not correct then print("<error>")  break  end
-                        print(i,unpack (exectimes))
-                        local curr_gflops = exectimes[1]
-                        -- print(curr_gflops) -- print analysis 
-                        if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-                            best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-                            terralib.tree.printraw(best)
-                        end
-                    end
-                end
-            end
-        end
-    end
+            	for _,t in ipairs(threads) do
+                	for _,v in ipairs(vectors) do
+	                        -- same until here
+	                    local my_conv = genconvolution(b,5,rm,rn,v,t)
+	                    if my_conv then
+	                        print(b,rm,rn,v,t)
+	                        my_conv:compile()
+	                        local i = math.floor(tunefor / b) * b
+	                        local curr_gflops = 0
+	                        local ctyp
+	                        local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
+	                            -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+	                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) 
+	                        end)
+	                        if not correct then print("<error>")  break  end
+	                        -- print(i,unpack (exectimes))
+	                        local curr_gflops = exectimes[1]
+	                        print(curr_gflops) -- print analysis 
+	                        if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+	                            best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, t = t }
+	                            -- terralib.tree.printraw(best)
+	                        end
+	                    end
+	                end
+	            end
+	        end
+	    end
+	end
 end
 
-local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
+local my_convolution = genconvolution(best.b,5,best.rm,best.rn,best.v, best.t)
 terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
