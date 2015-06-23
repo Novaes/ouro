@@ -71,7 +71,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local kk, ll = symbol("kk"), symbol("ll")
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
-	local temp_storeA = terralib.newlist() --todo remove
 
     for m = 0, RM+1 do
         for n = 0, RN-1 do --todo remove RN+1
@@ -117,16 +116,16 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-							-- if([mm] + m < NB-1 and [nn] + n < NB-1) then
+							if([mm] + m < NB-1 and [nn] + n < NB-1) then
 								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] means take a[-1][-1] necessary for c[0][0]
 								-- because for each block (0,0) means (1,1) for example
 
 								-- do a function that takes this return &{vector(double,3)} -> {} and set the 
 								-- print([a[x+1][y+1]] * [b[k][l]])
-								[a[x+1][y+1]] = [a[x+1][y+1]] * [b[k][l]]
+								-- [a[x+1][y+1]] = [a[x+1][y+1]] * [b[k][l]]
 								-- extractsum(&([vector(double,V)]([a[x+1][y+1]]) * [b[k][l]]),V)
 								-- [c[m][n]] = [c[m][n]] + extractsum([r[m][n]])
-							-- end
+							end
 						end
 					)
 				end
@@ -160,10 +159,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				if [nn] == 1 then 
 					vecstore(A, 0, [a[0][0]])
 				end
-				-- vecstore(A, 5, [a[1][0]])
-				-- vecstore(A, 10, [a[2][0]])
-				-- [temp_storeA];
-				-- IO.printf("storing C back done\n")
 				A = A + RN*V
 				C = C + RN*V
 			end
