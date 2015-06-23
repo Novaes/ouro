@@ -1,6 +1,8 @@
 local IO = terralib.includec("stdio.h")
 local MT = terralib.includec("pthread.h")
-local stdlib = terralib.includec("stdlib.h")
+local POOL = terralib.includec("include/thpool.h")
+terralib.linklibrary("lib/thpool.so")
+
 local number = double
 
 
@@ -204,6 +206,10 @@ terra L1Package:init(NB: int, l1conv0 : {&double, &double, &double, int, int, in
 end
 
 terra l1MTComputation(args: &opaque) : &opaque
+    --print thread
+    -- var x = MT.pthread_self()
+    -- IO.printf("Thread #%u working on task1\n", [int64](x))
+
     var f : &L1Package = [&L1Package](args)
     -- check received args problem
     var NB : int = (@f).NB
@@ -258,26 +264,20 @@ function genconvolution(NB,NBF,RM,RN,V)
         alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
         
-        var threads : MT.pthread_t[thrSIZE]
-        var count = 0
+        var thpool : POOL.threadpool = POOL.thpool_init(2)
         -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
+
         [ blockedloop(N,M,{NB2,NB},
                 function(m,n)
                 return quote
                     var pkg : L1Package
                     pkg:init(NB, l1conv0, M, N, A, sda, lda, B, ldb, C, ldc, m, n)
-                    MT.pthread_create(&(threads[count]), nil, l1MTComputation , &pkg)
-                    count = count + 1
+                    POOL.thpool_add_work(thpool, l1MTComputation,  &pkg)
         end end) ]
 
-        -- list
-        [ blockedloop(N,M,{NB2,NB},
-                function(m,n)
-                    return quote
-                    MT.pthread_join(threads[count],nil)
-                    count = count - 1
-        end end) ]    
-            
+        POOL.thpool_wait(thpool)
+
+        POOL.thpool_destroy(thpool)
         -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
     end
 end
