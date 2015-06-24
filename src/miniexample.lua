@@ -7,16 +7,6 @@ local alignment = 8
 local V = 4
 local VP = &vector(double,V)
 
-local terra vecload(data : &double, idx : int)
-	var addr = &(data[idx])
-	return @VP(addr)
-end
-
-local terra vecstore(data : &double, idx : int, v : vector(double,V))
-	var addr = &data[idx]
-	@VP(addr) = v
-end
-
 local function unalignedload(addr)
 	return `terralib.attrload(addr, { align = alignment })
 end
@@ -28,7 +18,7 @@ end
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore) 
 
 terra main()
-	var A : &double = [&double](cstdlib.malloc( 8 * sizeof(double)) )
+	var A : &double = [&double](cstdlib.malloc( 9 * sizeof(double)) )
 	var count = 1
 	for i=0,7 do
 		@(A+i) = count

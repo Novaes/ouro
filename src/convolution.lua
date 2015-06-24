@@ -1,7 +1,7 @@
 local IO = terralib.includec("stdio.h")
 local stdlib = terralib.includec("stdlib.h")
 local number = double
-
+local alignment = 8
 
 local function isinteger(x) return math.floor(x) == x end
 local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
@@ -55,14 +55,12 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	-- print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
 	local VP = &vector(double,V)
-	local terra vecload(data : &double, idx : int)
-		var addr = &data[idx]
-		return @VP(addr)
+	local function unalignedload(addr)
+		return `terralib.attrload(addr, { align = alignment })
 	end
 
-	local terra vecstore(data : &double, idx : int, v : vector(double,V))
-		var addr = &data[idx]
-		@VP(addr) = v
+	local function unalignedstore(addr,v)
+		return `terralib.attrstore(addr,v, { align = alignment })
 	end
 
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
@@ -71,11 +69,12 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local kk, ll = symbol("kk"), symbol("ll")
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
+	local calcc = terralib.newlist()
 
     for m = 0, RM+1 do
         for n = 0, RN-1 do --todo remove RN+1
             loadA:insert(quote
-                var [a[m][n]] = vecload(A, m*ldc + n*V) -- it is not n*V
+                var [a[m][n]] : vector(double,V) = unalignedload(VP(&A[m*ldc + n*V])) -- it is not n*V
             end)
         end
     end
@@ -88,19 +87,14 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
             storec:insert(quote
                 C[(m+1)*ldc + (n+1)] = [c[m][n]]
             end)
-             temp_storeA:insert(quote
-				vecstore(A, m*ldc + n*V,[a[m][n]])
-            end)
 		end
 	end
-
-	local calcc = terralib.newlist()
 
 	-- load full kernel
 	for  k=0, K-1 do
 		for l = 0, L/V - 1 do
 			loadkernel:insert(quote
-				var [b[k][l]] = vecload(B, k*ldb + l*V)
+				var [b[k][l]] : vector(double,V) = unalignedload(VP(&B[k*ldb + l*V]))
 			end)
 		end
 	end
@@ -121,8 +115,14 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 								-- because for each block (0,0) means (1,1) for example
 
 								-- do a function that takes this return &{vector(double,3)} -> {} and set the 
-								-- print([a[x+1][y+1]] * [b[k][l]])
-								-- [a[x+1][y+1]] = [a[x+1][y+1]] * [b[k][l]]
+								var v : vector(double,V) = [a[x+1][y+1]] * [b[k][l]]
+								-- var sum = 0
+								-- for i=0,V do
+								-- 	sum = sum + v[i]
+								-- end
+								-- [c[m][n]] = [c[m][n]] + sum
+
+								-- IO.printf("VALUE %f ",v[0])
 								-- extractsum(&([vector(double,V)]([a[x+1][y+1]]) * [b[k][l]]),V)
 								-- [c[m][n]] = [c[m][n]] + extractsum([r[m][n]])
 							end
@@ -148,7 +148,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				[loadkernel];
 				-- IO.printf("load B done\n")
 				-- IO.printf("loading A...\n")
-				-- llvmprefetch(A + sda*lda,0,3,1);
+			    -- llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				-- IO.printf("loading A done\n")
 				-- IO.printf("calculating C\n")
@@ -156,17 +156,14 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				-- IO.printf("calculating C done\n")
 				-- IO.printf("storing C back\n")
 				[storec];
-				if [nn] == 1 then 
-					vecstore(A, 0, [a[0][0]])
-				end
 				A = A + RN*V
 				C = C + RN*V
 			end
-			-- if ( ((NB-2)/(RN*V)) * RN*V + 1 < NB-1) then
-			-- 	var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
-			-- 	A = A - offset
-			-- 	C = C - offset
-			-- end
+			if ( ((NB-2)/(RN*V)) * RN*V + 1 < NB-1) then
+				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
+				A = A - offset
+				C = C - offset
+			end
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
 			C = C + 2
@@ -198,10 +195,10 @@ end
 
 function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
-    -- temporary needed for vector instruction
-	if not isinteger((NB-2)/(RN*V)) or not isinteger((NB-2)/RM) then
-		return false
-	end
+    -- needed for vector instruction
+	-- if not isinteger((NB-2)/(RN*V)) or not isinteger((NB-2)/RM) then
+	-- 	return false
+	-- end
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
@@ -209,7 +206,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 	local NB2 = NB * NBF
 
 	-- no prefetch, no boundary
-	local l1conv0 = genkernel(NB, RM, RN, V, false, K, L, false):printpretty()
+	local l1conv0 = genkernel(NB, RM, RN, V, false, K, L, false)
 	local l1conv0b = genkernel(NB, RM, RN, V, false, K, L, true)
 
 
@@ -241,7 +238,7 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {5,--[[10,16,24,32,40,48,56,64,1024]]}
+local blocksizes = {10,--[[10,16,24,32,40,48,56,64,1024]]}
 local regblocksM = {1}
 local regblocksN = {1}
 -- local vectors = {1,2,4,8,16}
