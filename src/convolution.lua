@@ -117,13 +117,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
     return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double--[[, [boundaryargs] ]])
         -- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
         -- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
+        [loadkernel];
         for [mm] = 1, NB-1, RM do
             -- how it goes by blocking, it can be greater than NB-1
             -- the correct for blocking would be use min([nn]+RN*V,NB-1), 
             -- however the generation of the code could not be done first, unless many ifs would be inserted  
             for [nn]=1, NB-1, RN*V do 
                 [loadc];
-                [loadkernel];
                 llvmprefetch(A + sda*lda,0,3,1);
                 [loadA];
                 [calcc];
