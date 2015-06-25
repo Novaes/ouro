@@ -29,6 +29,16 @@ function printMatrix(m,rows,columns)
   io.write("\n")
 end
 
+local function unalignedload(addr)
+	return `terralib.attrload(addr, { align = alignment })
+end
+
+local function unalignedstore(addr,v)
+	return `terralib.attrstore(addr,v, { align = alignment })
+end
+
+unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
+
 terra extractsum(ref : &opaque, V: int) -- todo change argument to V
 	-- var vecref : &vector(double,V) = [&vector(double,V)](ref)
 	-- var vec : vector(double,V) = @vecref
@@ -54,15 +64,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	-- assets NB/RM and NB/RN do not necessary
 	-- print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
-	local VP = &vector(double,V)
-	local function unalignedload(addr)
-		return `terralib.attrload(addr, { align = alignment })
-	end
-
-	local function unalignedstore(addr,v)
-		return `terralib.attrstore(addr,v, { align = alignment })
-	end
-
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
 	local sda,lda,ldb,ldc = symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
 	local a,b,c = symmat("a",RM+2,RN+2), symmat("b",K,L/V), symmat("c",RM,RN)
@@ -71,10 +72,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 	local calcc = terralib.newlist()
 
+	local VP = &vector(double,V)
+	local VimgP = &vector(double,V) -- scale it
+
     for m = 0, RM+1 do
-        for n = 0, RN-1 do --todo remove RN+1
+        for n = 0, RN-1 do -- todo remove RN+1
             loadA:insert(quote
-                var [a[m][n]] : vector(double,V) = unalignedload(VP(&A[m*ldc + n*V])) -- it is not n*V
+                var [a[m][n]] : vector(double,V) = unalignedload(VimgP(&A[m*ldc + n*V])) -- it is not n*V
             end)
         end
     end
@@ -116,11 +120,11 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 
 								-- do a function that takes this return &{vector(double,3)} -> {} and set the 
 								var v : vector(double,V) = [a[x+1][y+1]] * [b[k][l]]
-								-- var sum = 0
-								-- for i=0,V do
-								-- 	sum = sum + v[i]
-								-- end
-								-- [c[m][n]] = [c[m][n]] + sum
+								var sum = 0
+								for i=0,V do
+									sum = sum + v[i]
+								end
+								[c[m][n]] = [c[m][n]] + sum
 
 								-- IO.printf("VALUE %f ",v[0])
 								-- extractsum(&([vector(double,V)]([a[x+1][y+1]]) * [b[k][l]]),V)
