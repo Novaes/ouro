@@ -39,16 +39,6 @@ end
 
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
 
-terra extractsum(ref : &opaque, V: int) -- todo change argument to V
-	-- var vecref : &vector(double,V) = [&vector(double,V)](ref)
-	-- var vec : vector(double,V) = @vecref
-	-- var sum : int = 0
-	-- for i=0,V do
-	-- 	sum = sum + vec(i)
-	-- end
-	-- IO.printf("%d",sum)
-end
-
 -- generate L1 convolution 
 function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local M,N, boundaryargs
@@ -242,9 +232,9 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {10,--[[10,16,24,32,40,48,56,64,1024]]}
+local blocksizes = {5,--[[10,16,24,32,40,48,56,64,1024]]}
 local regblocksM = {1}
-local regblocksN = {3}
+local regblocksN = {1}
 -- local vectors = {1,2,4,8,16}
 local vectors = {3}
 
