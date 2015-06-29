@@ -244,7 +244,7 @@ end
 -- for small blocks
 local blocksizes = {10,--[[10,16,24,32,40,48,56,64,1024]]}
 local regblocksM = {1}
-local regblocksN = {1}
+local regblocksN = {3}
 -- local vectors = {1,2,4,8,16}
 local vectors = {3}
 
