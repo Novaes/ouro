@@ -61,14 +61,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 	local calcc = terralib.newlist()
-
 	local VP = &vector(double,V)
-	local VimgP = &vector(double,V) -- scale it
+	local v,sum = symbol("v"), symbol("sum")
 
     for m = 0, RM+1 do
         for n = 0, RN-1 do -- todo remove RN+1
             loadA:insert(quote
-                var [a[m][n]] : vector(double,V) = unalignedload(VimgP(&A[m*ldc + n*V])) -- it is not n*V
+                var [a[m][n]] : vector(double,V) = unalignedload(VP(&A[m*ldc + n*V])) -- it is not n*V
             end)
         end
     end
@@ -92,7 +91,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			end)
 		end
 	end
-
 	-- spatial 2D convolution
 	for m = 0, RM-1 do
 		for n = 0, RN-1 do
@@ -101,16 +99,25 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
 					x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
 					--no boundary cases
+					-- calcc:insert(
+					-- 	quote
+					-- 	var v : vector(double,V) 
+					-- 	var sum : int
+					-- end
+					-- )
+				
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
 							if([mm] + m < NB-1 and [nn] + n < NB-1) then
-								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] means take a[-1][-1] necessary for c[0][0]
+								-- remeber that taking the pos a[x+1][y+1], e.g. a[0][0] means take a[-1][-1] necessary for c[0][0]
 								-- because for each block (0,0) means (1,1) for example
-
 								-- do a function that takes this return &{vector(double,3)} -> {} and set the 
-								var v : vector(double,V) = [a[x+1][y+1]] * [b[k][l]]
-								var sum = 0
+								var v : vector(double,V) 
+								var sum : int
+					
+								v = [a[x+1][y+1]] * [b[k][l]]
+								sum = 0
 								for i=0,V do
 									sum = sum + v[i]
 								end
@@ -126,35 +133,25 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			end
 		end
 	end
-
 	return terra([A] : &double, [B] : &double, [C] : &double, --[[[T] : &double]] [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
+		[loadkernel];
 		for [mm] = 1, NB-1, RM do
 			-- how it goes by blocking, it can be greater than NB-1
 			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
 			-- however the generation of the code could not be done first, unless many ifs would be inserted  
-			for [nn]=1, NB-1, RN*V do 
-				-- IO.printf("loading C...\n")
+			for [nn]=1, NB-1, RN do 
 				[loadc];
-				-- IO.printf("load C done\n")
-                -- IO.printf("loading B...\n")
-				[loadkernel];
-				-- IO.printf("load B done\n")
-				-- IO.printf("loading A...\n")
 			    -- llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
-				-- IO.printf("loading A done\n")
-				-- IO.printf("calculating C\n")
 				[calcc];
-				-- IO.printf("calculating C done\n")
-				-- IO.printf("storing C back\n")
 				[storec];
-				A = A + RN*V
-				C = C + RN*V
+				A = A + RN
+				C = C + RN
 			end
-			if ( ((NB-2)/(RN*V)) * RN*V + 1 < NB-1) then
-				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
+			if ( ((NB-2)/(RN)) * RN + 1 < NB-1) then
+				var offset = (((NB-2)/(RN)) * (RN) + 1) + (RN)  - (NB-1)
 				A = A - offset
 				C = C - offset
 			end
@@ -193,7 +190,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- if not isinteger((NB-2)/(RN*V)) or not isinteger((NB-2)/RM) then
 	-- 	return false
 	-- end
-
+	assert(V == 3)
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
 
@@ -233,10 +230,11 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
 local blocksizes = {5,--[[10,16,24,32,40,48,56,64,1024]]}
-local regblocksM = {1}
+local regblocksM = {2}
 local regblocksN = {1}
 -- local vectors = {1,2,4,8,16}
-local vectors = {3}
+
+local vectors = {3} -- fixed
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
