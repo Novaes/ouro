@@ -283,20 +283,17 @@ function genconvolution(NB,NBF,RM,RN,V)
             function(m,n)
                 return quote
                 	pkgs[count/numTH]:addblock(m,n,l1conv0)
+                	cstdio.printf("adding to thread: %d\n",count/numTH)
                 	if (count+1) % numTH == 0 then
-                    	-- MT.pthread_create(&(threads[count/numTH]), nil, l1MTComputation , &pkgs[count])
+                		cstdio.printf("---> thread launched: %d\n",count/numTH)
+                    	MT.pthread_create(&threads[count/numTH], nil, l1MTComputation , &pkgs[count])
                     end
                     count = count + 1
-        end end) ]
-
-        -- [ blockedloop(M,N,{NB2,NB},
-        --         function(m,n)
-        --             return quote
-        --             -- MT.pthread_join(threads[count/taskspth],nil)
-        --             count = count - 1
-        -- end end) ]
-        -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
-
+       		 end end) ]
+        
+        for i=0,numTH do
+        	-- MT.pthread_join(&threads[count/numTH],nil)
+        end
     end
 end
 

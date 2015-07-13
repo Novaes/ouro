@@ -10,11 +10,11 @@ function CalcTime(fn)
 	local begin = terralib.currenttimeinseconds()
 	local current
 	local times = 0
-	repeat
+	-- repeat
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	until (current - begin) > 0.2
+	--until (current - begin) > 0.2
 	return (current - begin - adjust*times) / times 
 end
 
@@ -126,13 +126,12 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	for i,fn in ipairs(fns) do
 		local C = Cs[i]
 		local tocall = function() fn(M,N,K,L,A,B,C) end
-		tocall()
-		CalcTime(tocall) -- execution time
+		-- tocall()
+		-- CalcTime(tocall) -- execution time
+		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		printMatrix(A,M,N)
 		printMatrix(B,K,L)
 		printMatrix(C,M,N)
-		results[i] = CalcTime(tocall)
-		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		if i ~= 1 then
 			local C0 = Cs[1]
 			local C1 = Cs[i]
