@@ -1,8 +1,6 @@
 local IO = terralib.includec("stdio.h")
 local MT = terralib.includec("pthread.h")
-local POOL = terralib.includec("include/thpool.h")
-terralib.linklibrary("lib/thpool.so")
-
+local stdlib = terralib.includec("stdlib.h")
 local number = double
 
 
@@ -117,13 +115,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
     return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double--[[, [boundaryargs] ]])
         -- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
         -- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
-        [loadkernel];
         for [mm] = 1, NB-1, RM do
             -- how it goes by blocking, it can be greater than NB-1
             -- the correct for blocking would be use min([nn]+RN*V,NB-1), 
             -- however the generation of the code could not be done first, unless many ifs would be inserted  
             for [nn]=1, NB-1, RN*V do 
                 [loadc];
+                [loadkernel];
                 llvmprefetch(A + sda*lda,0,3,1);
                 [loadA];
                 [calcc];
@@ -170,9 +168,14 @@ terra forkedFn(args : &opaque) : &opaque
     return nil
 end
 
+numTH = 4
+threads = global(MT.pthread_t[numTH])
+taskspth = 4/numTH
+
 struct L1Package{
     NB: int
-    l1conv0 : {&double, &double, &double, int, int, int, int, double} -> {}
+    -- array of function pointers
+    l1conv0 : &({&double, &double, &double, int, int, int, int, double} -> {})
     M : int
     N : int
     A : &double
@@ -182,13 +185,15 @@ struct L1Package{
     ldb : int
     C : &double
     ldc : int
-    m : int
-    n : int
+    m : &int
+    n : &int
 }
 
-terra L1Package:init(NB: int, l1conv0 : {&double, &double, &double, int, int, int, int, double} -> {},  
+pkgs = global(L1Package[taskspth])
+
+terra L1Package:init(NB: int, l1conv0 : &({&double, &double, &double, int, int, int, int, double} -> {}),  
         M : int, N : int, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
-        ldc : int, m: int, n: int)
+        ldc : int, m: &int, n: &int)
     
     self.NB = NB
     self.l1conv0 = l1conv0
@@ -206,14 +211,10 @@ terra L1Package:init(NB: int, l1conv0 : {&double, &double, &double, int, int, in
 end
 
 terra l1MTComputation(args: &opaque) : &opaque
-    --print thread
-    -- var x = MT.pthread_self()
-    -- IO.printf("Thread #%u working on task1\n", [int64](x))
-
     var f : &L1Package = [&L1Package](args)
     -- check received args problem
     var NB : int = (@f).NB
-    var l1conv0 : {&double,&double,&double, int, int, int, int, double} -> {} = (@f).l1conv0
+    var l1conv0 : &({&double,&double,&double, int, int, int, int, double} -> {}) = (@f).l1conv0
     var M : int = (@f).M
     var N : int = (@f).N
     var A : &double = (@f).A
@@ -223,26 +224,29 @@ terra l1MTComputation(args: &opaque) : &opaque
     var ldb : int = (@f).ldb
     var C : &double = (@f).C
     var ldc : int = (@f).ldc
-    var m : int = (@f).m
-    var n : int = (@f).n
+    var m : &int = (@f).m
+    var n : &int = (@f).n
 
     -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",NB,NB2,M,N,K,L,sda,lda,ldb,ldc,kCenterX,kCenterY)
     -- IO.printf("M: %d\n",M)
 
     --compute l1sized kernel
-    var MM,NN = min(M-m,NB),min(N-n,NB)
-    var isboundary = MM < NB or NN < NB
-    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                
-    l1conv0(AA,
-    B,
-    CC,
-    sda,lda,ldb,ldc,0)
+    for i=0,taskspth do
+	    var MM,NN = min(M-m[i],NB),min(N-n[i],NB)
+	    var isboundary = MM < NB or NN < NB
+	    var AA,CC = A + (m[i]*lda + n[i]),C + (m[i]*ldc + n[i])
+	                
+	    l1conv0[i](AA,
+	    B,
+	    CC,
+	    sda,lda,ldb,ldc,0)
+	end
 
     return nil
 end
 
-function genconvolution(NB,NBF,RM,RN,V,NT)
+t = global(int,0)
+function genconvolution(NB,NBF,RM,RN,V)
     -- register blocking does not need to be a a multiple of the blocksize anymore
     -- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
     -- return false
@@ -257,73 +261,77 @@ function genconvolution(NB,NBF,RM,RN,V,NT)
     
     local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
     -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
-    
-    local thrSIZE =  NT
 
     return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
         alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
-        var thpool : POOL.threadpool = POOL.thpool_init(thrSIZE)
-    
-        [ blockedloop(N,M,{NB2,NB},
+        var count = 0
+        -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
+        [ blockedloop(M,N,{NB2,NB},
                 function(m,n)
                 return quote
-                    var pkg : L1Package
-                    pkg:init(NB, l1conv0, M, N, A, sda, lda, B, ldb, C, ldc, m, n)
-                    POOL.thpool_add_work(thpool, l1MTComputation,  &pkg)
+                    -- var pkg : L1Package
+                    -- pkg:init(NB, l1conv0, M, N, A, sda, lda, B, ldb, C, ldc, m, n)
+                    -- MT.pthread_create(&(threads[count]), nil, l1MTComputation , &pkg)
+                    count = count + 1
         end end) ]
 
-        POOL.thpool_wait(thpool)
+        -- number of iterations
+        t = t + 1
+		print(t)
 
-        POOL.thpool_destroy(thpool)
+        -- list
+        [ blockedloop(M,N,{NB2,NB},
+                function(m,n)
+                    return quote
+                    -- MT.pthread_join(threads[count],nil)
+                    count = count - 1
+        end end) ]
         -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
     end
 end
 
-local blocksizes = {20--[[10 ,16,24,32,40,48,56,64,1024]]}
-local regblocks = {1,2,3 --[[2,3]]}
+local blocksizes = {5--[[,10 ,16,24,32,40,48,56,64,1024]]}
+local regblocks = {1--[[, 2,3]]}
 local vectors = {1 --[[,2,4,8,16]]}
-local threads = {1,3,4,6, --[[,2,4,8,16]]}
 
 -- initialized (defined structure of best)
-local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, t = 4}
+local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
-    local tunefor = 1000 --[[1024]] -- full size of the matrix
+    local tunefor = 10 --[[1024]] -- full size of the matrix
     --change for 10 later
     local harness = require("lib/matrixtestharness")
     for _,b in ipairs(blocksizes) do
         for _,rm in ipairs(regblocks) do
             for _,rn in ipairs(regblocks) do
-            	for _,t in ipairs(threads) do
-                	for _,v in ipairs(vectors) do
-	                        -- same until here
-	                    local my_conv = genconvolution(b,5,rm,rn,v,t)
-	                    if my_conv then
-	                        print(b,rm,rn,v,t)
-	                        my_conv:compile()
-	                        local i = math.floor(tunefor / b) * b
-	                        local curr_gflops = 0
-	                        local ctyp
-	                        local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-	                            -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-	                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) 
-	                        end)
-	                        if not correct then print("<error>")  break  end
-	                        -- print(i,unpack (exectimes))
-	                        local curr_gflops = exectimes[1]
-	                        print(curr_gflops) -- print analysis 
-	                        if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-	                            best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, t = t }
-	                            -- terralib.tree.printraw(best)
-	                        end
-	                    end
-	                end
-	            end
-	        end
-	    end
-	end
+                for _,v in ipairs(vectors) do
+                        -- same until here
+                    local my_conv = genconvolution(b,1,rm,rn,v)
+                    if my_conv then
+                        print(b,rm,rn,v)
+                        my_conv:compile()
+                        local i = math.floor(tunefor / b) * b
+                        local curr_gflops = 0
+                        local ctyp
+                        local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
+                            -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+                            my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) 
+                        end)
+                        if not correct then print("<error>")  break  end
+                        print(i,unpack (exectimes))
+                        local curr_gflops = exectimes[1]
+                        -- print(curr_gflops) -- print analysis 
+                        if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+                            best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
+                            terralib.tree.printraw(best)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
-local my_convolution = genconvolution(best.b,5,best.rm,best.rn,best.v, best.t)
+local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
 terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
