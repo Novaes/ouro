@@ -1,4 +1,4 @@
-local IO = terralib.includec("stdio.h")
+local cstdio = terralib.includec("stdio.h")
 local MT = terralib.includec("pthread.h")
 local stdlib = terralib.includec("stdlib.h")
 local number = double
@@ -164,18 +164,13 @@ function blockedloop(M,N,blocksizes,bodyfn)
   return generatelevel(1,0,0,M,N)
 end
 
-terra forkedFn(args : &opaque) : &opaque
-    return nil
-end
-
-numTH = 4
-threads = global(MT.pthread_t[numTH])
-taskspth = 4/numTH
+local numTH = 2
+local taskspth = 4/numTH -- tunefor/numTH
 
 struct L1Package{
     NB: int
     -- array of function pointers
-    l1conv0 : &({&double, &double, &double, int, int, int, int, double} -> {})
+    l1convs : ({&double, &double, &double, int, int, int, int, double} -> {})[taskspth]
     M : int
     N : int
     A : &double
@@ -185,18 +180,16 @@ struct L1Package{
     ldb : int
     C : &double
     ldc : int
-    m : &int
-    n : &int
+    m : int[taskspth]
+    n : int[taskspth]
+    curr : int
 }
 
-pkgs = global(L1Package[taskspth])
+local pkg = L1Package
 
-terra L1Package:init(NB: int, l1conv0 : &({&double, &double, &double, int, int, int, int, double} -> {}),  
-        M : int, N : int, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
-        ldc : int, m: &int, n: &int)
-    
+terra L1Package:init(NB: int, M : int, N : int, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+        ldc : int)
     self.NB = NB
-    self.l1conv0 = l1conv0
     self.M = M
     self.N = N
     self.A = A
@@ -206,15 +199,24 @@ terra L1Package:init(NB: int, l1conv0 : &({&double, &double, &double, int, int, 
     self.ldb = ldb
     self.C = C
     self.ldc = ldc
-    self.m = m
-    self.n = n
+    self.curr = 0
+end
+
+terra L1Package:addblock(m: int, n: int, l1conv : {&double, &double, &double, int, int, int, int, double} -> {})
+	if self.curr >= taskspth then
+		cstdio.printf("Trying to insert %u task in a full thread\n",l1conv)
+	end
+	self.m[self.curr] = m
+	self.n[self.curr] = n
+	self.l1convs[self.curr] = l1conv
+	self.curr = self.curr + 1
 end
 
 terra l1MTComputation(args: &opaque) : &opaque
     var f : &L1Package = [&L1Package](args)
     -- check received args problem
     var NB : int = (@f).NB
-    var l1conv0 : &({&double,&double,&double, int, int, int, int, double} -> {}) = (@f).l1conv0
+    var l1convs : &({&double,&double,&double, int, int, int, int, double} -> {}) = (@f).l1convs
     var M : int = (@f).M
     var N : int = (@f).N
     var A : &double = (@f).A
@@ -226,17 +228,17 @@ terra l1MTComputation(args: &opaque) : &opaque
     var ldc : int = (@f).ldc
     var m : &int = (@f).m
     var n : &int = (@f).n
-
-    -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",NB,NB2,M,N,K,L,sda,lda,ldb,ldc,kCenterX,kCenterY)
-    -- IO.printf("M: %d\n",M)
+    var tasks : int = (@f).curr
+    -- cstdio.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",NB,NB2,M,N,K,L,sda,lda,ldb,ldc,kCenterX,kCenterY)
+    -- cstdio.printf("M: %d\n",M)
 
     --compute l1sized kernel
-    for i=0,taskspth do
+    for i=0,tasks do
 	    var MM,NN = min(M-m[i],NB),min(N-n[i],NB)
 	    var isboundary = MM < NB or NN < NB
 	    var AA,CC = A + (m[i]*lda + n[i]),C + (m[i]*ldc + n[i])
 	                
-	    l1conv0[i](AA,
+	    l1convs[i](AA,
 	    B,
 	    CC,
 	    sda,lda,ldb,ldc,0)
@@ -245,7 +247,8 @@ terra l1MTComputation(args: &opaque) : &opaque
     return nil
 end
 
-t = global(int,0)
+local t = 0
+
 function genconvolution(NB,NBF,RM,RN,V)
     -- register blocking does not need to be a a multiple of the blocksize anymore
     -- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
@@ -258,36 +261,42 @@ function genconvolution(NB,NBF,RM,RN,V)
     local NB2 = NB * NBF
 
     -- no prefetch, no boundary
-    
     local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
-    -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+    
+    local threads = MT.pthread_t[numTH]
 
+    -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
     return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
-        alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+       alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
+        
         var count = 0
-        -- IO.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: %d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
+        var pkgs : L1Package[numTH]
+        for i=0, numTH do
+			pkgs[i]:init(NB, M, N, A, sda, lda, B, ldb, C, ldc)
+		end
+
+        -- cstdio.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: 
+        -- 	%d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,
+        -- 	pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
         [ blockedloop(M,N,{NB2,NB},
-                function(m,n)
+            function(m,n)
                 return quote
-                    -- var pkg : L1Package
-                    -- pkg:init(NB, l1conv0, M, N, A, sda, lda, B, ldb, C, ldc, m, n)
-                    -- MT.pthread_create(&(threads[count]), nil, l1MTComputation , &pkg)
+                	pkgs[count/numTH]:addblock(m,n,l1conv0)
+                	if (count+1) % numTH == 0 then
+                    	-- MT.pthread_create(&(threads[count/numTH]), nil, l1MTComputation , &pkgs[count])
+                    end
                     count = count + 1
         end end) ]
 
-        -- number of iterations
-        t = t + 1
-		print(t)
-
-        -- list
-        [ blockedloop(M,N,{NB2,NB},
-                function(m,n)
-                    return quote
-                    -- MT.pthread_join(threads[count],nil)
-                    count = count - 1
-        end end) ]
+        -- [ blockedloop(M,N,{NB2,NB},
+        --         function(m,n)
+        --             return quote
+        --             -- MT.pthread_join(threads[count/taskspth],nil)
+        --             count = count - 1
+        -- end end) ]
         -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+
     end
 end
 
