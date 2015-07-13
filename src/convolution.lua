@@ -164,8 +164,8 @@ function blockedloop(M,N,blocksizes,bodyfn)
   return generatelevel(1,0,0,M,N)
 end
 
-local numTH = 2
-local taskspth = 4/numTH -- tunefor/numTH
+local thsize = 2
+local taskspth = 4/thsize -- tunefor/thsize
 
 struct L1Package{
     NB: int
@@ -263,36 +263,37 @@ function genconvolution(NB,NBF,RM,RN,V)
     -- no prefetch, no boundary
     local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false)
     
-    local threads = MT.pthread_t[numTH]
-
     -- local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
     return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
-       alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+        alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
         ldc : int, kCenterX: int, kCenterY: int) 
-        
+
+        var threads : MT.pthread_t[thsize]
         var count = 0
-        var pkgs : L1Package[numTH]
-        for i=0, numTH do
+        var pkgs : L1Package[thsize]
+        for i=0, thsize do
 			pkgs[i]:init(NB, M, N, A, sda, lda, B, ldb, C, ldc)
 		end
-
         -- cstdio.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: 
         -- 	%d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,
         -- 	pkg.ldb,pkg.ldc,pkg.kCenterX,pkg.kCenterY)
         [ blockedloop(M,N,{NB2,NB},
             function(m,n)
                 return quote
-                	pkgs[count/numTH]:addblock(m,n,l1conv0)
-                	cstdio.printf("adding to thread: %d\n",count/numTH)
-                	if (count+1) % numTH == 0 then
-                		cstdio.printf("---> thread launched: %d\n",count/numTH)
-                    	MT.pthread_create(&threads[count/numTH], nil, l1MTComputation , &pkgs[count])
+                	pkgs[count/thsize]:addblock(m,n,l1conv0)
+                	cstdio.printf("adding to thread: %d\n",count/thsize)
+                	if (count+1) % thsize == 0 then
+                		cstdio.printf("---> thread launched: %d\n",count/thsize)
+                    	if MT.pthread_create(&threads[count/thsize], nil, l1MTComputation , &pkgs[count/thsize]) ~= 0 then 
+                    		cstdio.printf("Thread #%u creation error",threads[count/thsize])
+                    	end
                     end
                     count = count + 1
        		 end end) ]
-        
-        for i=0,numTH do
-        	-- MT.pthread_join(&threads[count/numTH],nil)
+        for i=0,thsize do
+        	if MT.pthread_join(threads[i],nil) ~= 0 then
+        		cstdio.printf("Thread #%u join error",i) 
+        	end
         end
     end
 end
