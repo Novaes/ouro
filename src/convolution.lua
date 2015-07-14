@@ -170,7 +170,7 @@ local taskspth = 4/thsize -- tunefor/thsize
 struct L1Package{
     NB: int
     -- array of function pointers
-    l1convs : ({&double, &double, &double, int, int, int, int, double} -> {})[taskspth]
+    l1conv : {&double, &double, &double, int, int, int, int, double} -> {}
     M : int
     N : int
     A : &double
@@ -188,7 +188,8 @@ struct L1Package{
 local pkg = L1Package
 
 terra L1Package:init(NB: int, M : int, N : int, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
-        ldc : int)
+        ldc : int, l1conv : {&double, &double, &double, int, int, int, int, double} -> {})
+	self.l1conv = l1conv
     self.NB = NB
     self.M = M
     self.N = N
@@ -202,13 +203,12 @@ terra L1Package:init(NB: int, M : int, N : int, A : &double, sda: int, lda : int
     self.curr = 0
 end
 
-terra L1Package:addblock(m: int, n: int, l1conv : {&double, &double, &double, int, int, int, int, double} -> {})
+terra L1Package:addblock(m: int, n: int)
 	if self.curr >= taskspth then
-		cstdio.printf("Trying to insert %u task in a full thread\n",l1conv)
+		cstdio.printf("Trying to insert (%d,%d) task in a full thread\n",m,n)
 	end
 	self.m[self.curr] = m
 	self.n[self.curr] = n
-	self.l1convs[self.curr] = l1conv
 	self.curr = self.curr + 1
 end
 
@@ -216,7 +216,7 @@ terra l1MTComputation(args: &opaque) : &opaque
     var f : &L1Package = [&L1Package](args)
     -- check received args problem
     var NB : int = (@f).NB
-    var l1convs : &({&double,&double,&double, int, int, int, int, double} -> {}) = (@f).l1convs
+    var l1conv : {&double,&double,&double, int, int, int, int, double} -> {} = (@f).l1conv
     var M : int = (@f).M
     var N : int = (@f).N
     var A : &double = (@f).A
@@ -238,7 +238,7 @@ terra l1MTComputation(args: &opaque) : &opaque
 	    var isboundary = MM < NB or NN < NB
 	    var AA,CC = A + (m[i]*lda + n[i]),C + (m[i]*ldc + n[i])
 	                
-	    l1convs[i](AA,
+	    l1conv(AA,
 	    B,
 	    CC,
 	    sda,lda,ldb,ldc,0)
@@ -272,7 +272,7 @@ function genconvolution(NB,NBF,RM,RN,V)
         var count = 0
         var pkgs : L1Package[thsize]
         for i=0, thsize do
-			pkgs[i]:init(NB, M, N, A, sda, lda, B, ldb, C, ldc)
+			pkgs[i]:init(NB, M, N, A, sda, lda, B, ldb, C, ldc, l1conv0)
 		end
         -- cstdio.printf("NB: %d NB2: %d m: %d n: %d k: %d l: %d sda: %d lda: %d ldb: %d ldc: %d kCenterX: 
         -- 	%d kCenterY: %d\n",pkg.NB,pkg.NB2,pkg.M,pkg.N,pkg.K,pkg.L,pkg.sda,pkg.lda,
@@ -280,7 +280,7 @@ function genconvolution(NB,NBF,RM,RN,V)
         [ blockedloop(M,N,{NB2,NB},
             function(m,n)
                 return quote
-                	pkgs[count/thsize]:addblock(m,n,l1conv0)
+                	pkgs[count/thsize]:addblock(m,n)
                 	cstdio.printf("adding to thread: %d\n",count/thsize)
                 	if (count+1) % thsize == 0 then
                 		cstdio.printf("---> thread launched: %d\n",count/thsize)
