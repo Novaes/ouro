@@ -247,8 +247,6 @@ terra l1MTComputation(args: &opaque) : &opaque
     return nil
 end
 
-local t = 0
-
 function genconvolution(NB,NBF,RM,RN,V)
     -- register blocking does not need to be a a multiple of the blocksize anymore
     -- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
