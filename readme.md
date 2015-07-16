@@ -12,6 +12,7 @@
     libs:  
         image.t:image library
         matrixtestharness.t: time measure in the auto-tuning process
+        multithreads.t: multi-thread library based on pthreads
 
     branching tags:
       wip: works in progress
