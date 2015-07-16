@@ -8,7 +8,7 @@
     
     running:
         image test: use makefile
-        numerical tests: terra src/convolution.lua
+        numerical tests: terra src/convolution.lua (make sure terra is in your $PATH or you have an alias to it)
 
     most important files: 
         src/kernel.t: gerates a convolution of size NB by NB
