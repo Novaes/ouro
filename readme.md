@@ -5,6 +5,10 @@
     requirements:
         Terra (github.com/zdevito/terra)
         Accelerate framework for dgemm/convolution tests
+    
+    running:
+        image test: use makefile
+        numerical tests: terra src/convolution.lua
 
     most important files: 
         src/kernel.t: gerates a convolution of size NB by NB
