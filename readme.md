@@ -11,8 +11,7 @@
         numerical tests: terra src/convolution.lua (make sure terra is in your $PATH or you have an alias to it)
 
     most important files: 
-        src/kernel.t: gerates a convolution of size NB by NB
-        src/convolve.lua: generates a convolution over an image
+        src/convolution.lua: generates the numerical convolution over an image
         references/convolution.cpp: future benchmarking with other implementations
         src/examples/: some minimal code of implemented features
 
