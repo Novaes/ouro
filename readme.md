@@ -9,6 +9,7 @@
     running:
         image test: use makefile
         numerical tests: terra src/convolution.lua (make sure terra is in your $PATH or you have an alias to it)
+
     most important branches: 
         master: by Direct method (basic)
         wip/mthreading: by Direct method (multi-threaded)
