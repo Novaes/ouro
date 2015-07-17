@@ -20,6 +20,7 @@
         image.t:image library (adapted to the project needs from github.com/jameshegarty/darkroom)
         matrixtestharness.t: time measure in the auto-tuning process
         multithreads.t: multi-thread library based on pthreads
+        fftkernels.t: n-point kernels for FFT
 
     branching tags:
       wip: works in progress
