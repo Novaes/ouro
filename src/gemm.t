@@ -1,6 +1,6 @@
 local number = double
 local alignment = 8
-local dotune = true
+local dotune = false
 
 function symmat(name,I,...)
 	if not I then return symbol(name) end
@@ -24,7 +24,6 @@ end
 
 unalignedload,unalignedstore = macro(unalignedload),macro(unalignedstore)
 
--- ==============================================================================
 function genkernel(NB, RM, RN, V, alpha, boundary)
 	local M,N,K, boundaryargs
 
@@ -111,8 +110,6 @@ local terra min(a : int, b : int)
 	return terralib.select(a < b, a, b)
 end
 
--- ==============================================================================
--- Change for the convolution one, add the ll
 function blockedloop(N,M,K,blocksizes,bodyfn)
   local function generatelevel(n,ii,jj,kk,bb0,bb1,bb2)
     if n > #blocksizes then
@@ -123,11 +120,11 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
                    for j = jj,min(jj+bb1,M),blocksize do
                       for k = kk,min(kk+bb2,K),blocksize do
                         [ generatelevel(n+1,i,j,k,blocksize,blocksize,blocksize) ]
-           end end end end
-  end
-  return generatelevel(1,0,0,0,N,M,K)
+           end end end end 
+    end
+  return generatelevel(1,0,0,0,N,M,K) 
 end
--- ==============================================================================
+
 function generatedgemm(NB,NBF,RM,RN,V)
 	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
@@ -195,7 +192,9 @@ if dotune then
 						local avg = 0
 						local ctyp
 						local s, times = harness.timefunctions(tostring(number),i,i,i,function(M,K,N,A,B,C)
+							--lower
 							my_dgemm(nil,M,N,K,1.0,A,K,B,N,0.0,C,N)
+							--lifting
 						end)
 						if not s then
 							print("<error>")
