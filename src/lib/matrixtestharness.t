@@ -75,7 +75,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	local B = ffi.new(ctyp,K*L)
 
 	--specific example A
-	-- generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
+	generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
 	-- printMatrix(A,M,N)
 
 	-- specific examples B
@@ -94,11 +94,11 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	-- printMatrix(B,K,L)
 	
 	-- randomizer A
-	for m = 0, M-1 do
-		for n = 0, N-1 do
-			A[m*N + n] = math.random(0,9)
-		end
-	end
+	-- for m = 0, M-1 do
+	--	for n = 0, N-1 do
+	--		A[m*N + n] = math.random(0,9)
+	--	end
+	-- end
 
 	-- randomizer B
 	-- for k = 0, K-1 do
