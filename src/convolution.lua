@@ -223,7 +223,7 @@ function genparameters(k,nblocks)
 end
 
 -- Different blocksizes for the same result implies in padding overheading 
-local kernels = {3} -- e.g. 3 means 3x3 kernels
+local kernels = {3,5} -- e.g. 3 means 3x3 kernels
 local regblocks = {1,2,3}
 local nblocksizes = 2
 -- local blocksizes = {16,24,32,40,48,56,64,1024}
