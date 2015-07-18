@@ -11,11 +11,10 @@
         numerical tests: terra src/convolution.lua (make sure terra is in your $PATH or you have an alias to it)
 
     most important branches: 
-        master: by Direct method (basic)
-        wip/mthreading: by Direct method (multi-threaded)
+        --> master: by Direct method (multithreaded and using vector instruction)
         -> wip/multiple_kernels: by Direct method (using multiple-kernels)
         wip/lowering: by Lowering (basic)
-        -> wip/optlowering: by Lowering (multi-threaded)
+        -> wip/optlowering: by Lowering (multi-threaded, using optimized gemm.t)
         -> wip/fastconvolution: by FFT method
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
         wip/vectorinst: Direct method using vector instruction
