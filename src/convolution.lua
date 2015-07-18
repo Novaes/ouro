@@ -227,6 +227,30 @@ local blocksizes = {5--[[,10 ,16,24,32,40,48,56,64,1024]]}
 local regblocks = {1--[[, 2,3]]}
 local vectors = {3 --[[,2,4,8,16]]}
 
+-- [[ Dependence between block size and kernel size only to check correctness ]]
+function genparameters(k,nblocks)
+	local blocksizes, vectors = {}, {}
+	local tunefor
+	for i=1,nblocks do
+		blocksizes[i] = ( k + 2 ) * i
+	end
+	vectors[1] = k
+	
+	-- min of 16 kernels (usual 1024 by max blocks of 64)
+	local iter = 1 --16 
+	tunefor = nblocks*(k+2) * iter
+
+	-- TUNEFOR will be fixed equal to IMAGESIZE
+	return tunefor, blocksizes, vectors
+end
+
+-- Different blocksizes for the same result implies in padding overheading 
+local kernels = {3} -- e.g. 3 means 3x3 kernels
+local regblocks = {1,2,3}
+local nblocksizes = 2
+-- local blocksizes = {16,24,32,40,48,56,64,1024}
+-- vectors = {1,2,4,8} -- vector is always equal to kernel dim size
+
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
