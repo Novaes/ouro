@@ -205,43 +205,61 @@ function genconvolution(NB,NBF,RM,RN,V)
 	end
 end
 
+-- [[ Dependence between block size and kernel size only to check correctness ]]
+function genparameters(k,nblocks)
+	local blocksizes, vectors = {}, {}
+	local tunefor
+	for i=1,nblocks do
+		blocksizes[i] = ( k + 2 ) * i
+	end
+	vectors[1] = k
+	
+	-- min of 16 kernels (usual 1024 by max blocks of 64)
+	local iter = 1 --16 
+	tunefor = nblocks*(k+2) * iter
+
+	-- TUNEFOR will be fixed equal to IMAGESIZE
+	return tunefor, blocksizes, vectors
+end
+
 -- Different blocksizes for the same result implies in padding overheading 
--- for small blocks
-local blocksizes = {5,10--[[16,24,32,40,48,56,64,1024]]}
+local kernels = {3} -- e.g. 3 means 3x3 kernels
 local regblocks = {1,2,3}
--- local vectors = {1,2,4,8,16}
-local vectors = {1}
+local nblocksizes = 2
+-- local blocksizes = {16,24,32,40,48,56,64,1024}
+-- vectors = {1,2,4,8} -- vector is always equal to kernel dim size
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 20 -- full size of the matrix
-	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-	for _,b in ipairs(blocksizes) do
-		for _,rm in ipairs(regblocks) do
-			for _,rn in ipairs(regblocks) do
-				for _,v in ipairs(vectors) do
-						-- same until here
-					local my_conv = genconvolution(b,1,rm,rn,v)
-					if my_conv then
-						print(b,rm,rn,v)
-						my_conv:compile()
-						local i = math.floor(tunefor / b) * b
-						local curr_gflops = 0
-						local ctyp
-						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
-	                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-						end)
-						if not correct then	print("<error>")  break  end
-						print(i,unpack (exectimes))
-						local curr_gflops = exectimes[1]
-						-- print(curr_gflops) -- print analysis 
-						if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-							best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-							terralib.tree.printraw(best)
+	for _,k in ipairs(kernels) do
+		local tunefor, blocksizes, vectors = genparameters(k,nblocksizes)
+		for _,b in ipairs(blocksizes) do
+			for _,rm in ipairs(regblocks) do
+				for _,rn in ipairs(regblocks) do
+					for _,v in ipairs(vectors) do
+							-- same until here
+						local my_conv = genconvolution(b,1,rm,rn,v)
+						if my_conv then
+							print(b,rm,rn,v)
+							my_conv:compile()
+							local i = math.floor(tunefor / b) * b
+							local curr_gflops = 0
+							local ctyp
+							local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
+		                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+							end)
+							if not correct then	print("<error>")  break  end
+							print(i,unpack (exectimes))
+							local curr_gflops = exectimes[1]
+							-- print(curr_gflops) -- print analysis 
+							if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+								best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
+								terralib.tree.printraw(best)
+							end
 						end
 					end
 				end
