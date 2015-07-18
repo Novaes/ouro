@@ -13,7 +13,6 @@
     most important branches: 
         --> master: by Direct method (multithreaded and using vector instruction)
         -> wip/multiple_kernels: by Direct method (using multiple-kernels)
-        wip/lowering: by Lowering (basic)
         -> wip/optlowering: by Lowering (multi-threaded, using optimized gemm.t)
         -> wip/fastconvolution: by FFT method
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
