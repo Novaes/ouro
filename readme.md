@@ -12,11 +12,9 @@
 
     most important branches: 
         --> master: by Direct method (multithreaded and using vector instruction)
-        -> wip/multiple_kernels: by Direct method (using multiple-kernels)
         -> wip/optlowering: by Lowering (multi-threaded, using optimized gemm.t)
         -> wip/fastconvolution: by FFT method
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
-        wip/vectorinst: Direct method using vector instruction
 
     most important files: 
         src/convolution.lua: generates the numerical convolution over an image
