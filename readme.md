@@ -7,15 +7,19 @@
         Accelerate framework for dgemm/convolution tests
     
     running:
-        image test: use makefile
-        numerical tests: terra src/convolution.lua (make sure terra is in your $PATH or you have an alias to it)
+        image test: use makefile (It generates imageconv.o)
+        numerical tests: terra src/convolution.lua (it generates numconv.o)
+        *Make sure terra is in your $PATH or you have an alias to it
 
     most important branches: 
-        --> master: by Direct method (multithreaded and using vector instruction)
-        -> wip/optlowering: by Lowering (multi-threaded, using optimized gemm.t)
-        -> wip/fastconvolution: by FFT method
+        -> master: by Direct method (multi-threaded and using vector instr)
+        -> wip/optlowering: by Lowering (multi-threaded, using optimized GEMM)
+        -> wip/fastconvolution: by FFT method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
-
+        wip/mthreading: Direct method only multi-threading
+        wip/vectinstr: Direct method only using vecinstr
+        
+        
     most important files: 
         src/convolution.lua: generates the numerical convolution over an image
         references/convolution.cpp: future benchmarking with other implementations

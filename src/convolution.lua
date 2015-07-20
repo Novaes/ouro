@@ -205,12 +205,12 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
         [ blockedloop(M,N,{NB2,NB},
             function(m,n)
                 return quote
-                	pkgs[count/thsize]:addblock(m,n)
-                	cstdio.printf("adding to thread: %d\n",count/thsize)
-                	if (count+1) % thsize == 0 then
-                		cstdio.printf("---> thread launched: %d\n",count/thsize)
-                    	if MT.pthread_create(&threads[count/thsize], nil, l1MTComputation , &pkgs[count/thsize]) ~= 0 then 
-                    		cstdio.printf("Thread #%u creation error",threads[count/thsize])
+                	pkgs[count/taskspth]:addblock(m,n)
+                	cstdio.printf("adding to thread: %d\n",count/taskspth)
+                	if (count+1) % taskspth == 0 then
+                		cstdio.printf("---> thread launched: %d\n",count/taskspth)
+                    	if MT.pthread_create(&threads[count/taskspth], nil, l1MTComputation , &pkgs[count/taskspth]) ~= 0 then 
+                    		cstdio.printf("Thread #%u creation error",threads[count/taskspth])
                     	end
                     end
                     count = count + 1
