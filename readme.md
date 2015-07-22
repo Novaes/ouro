@@ -1,5 +1,5 @@
 ### Auto-tuner that builds optimized kernels for CNNs ###        
-    The three different methods to compute the convolution are implemented: Direct Method, Lowering and Convolution by FFT
+    The three different methods to compute the convolution are each one in their branches: Direct Method (master), Lowering (wip/optlowering) and Convolution by FFT (wip/fastconvolution)
 
     requirements:
         Terra (github.com/zdevito/terra)
@@ -17,7 +17,7 @@
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
         wip/mthreading: Direct method only multi-threading
         wip/vectinstr: Direct method only using vecinstr
-        
+        wip/benchmarks: Benchmark with MKL for Direct and FFT
         
     most important files: 
         src/convolution.lua: generates the numerical convolution over an image
