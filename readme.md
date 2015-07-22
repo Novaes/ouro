@@ -1,6 +1,5 @@
 ### Auto-tuner that builds optimized kernels for CNNs ###        
-    The different methods are each one on its branch (wip/direct, wip/lowering, wip/fft)
-    I'm most currently working on wip/fft
+    The three different methods to compute the convolution are implemented: Direct Method, Lowering and Convolution by FFT
 
     requirements:
         Terra (github.com/zdevito/terra)
@@ -39,4 +38,5 @@
     
     tags:
       v1.0: no pointer optimization
-      v2.0: vector optimization
+      v1.5: vector optimization
+      v2.0: standard direct
