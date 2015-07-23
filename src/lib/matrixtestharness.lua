@@ -156,8 +156,8 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
 		-- CORRECTNESS
-		-- naiveConvolve(CR,A,M,N,B,K,L)
-		-- printMatrix(CR,M,N)
+		naiveConvolve(CR,A,M,N,B,K,L)
+		printMatrix(CR,M,N)
 		-- ASSERT 
 		
 		if i ~= 1 then
