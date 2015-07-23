@@ -69,10 +69,32 @@ function generateA(A, M, N, inX, inY)
 	end
 end
 
+function naiveConvolve(out, inp, M, N, kernel, K, L)
+  local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
+	for i=0, M-1 do
+		for j=0, N-1 do
+			out[i*N + j] = 0
+		  	for m=0,K-1 do
+		  		for n=0,L-1 do
+			      	--boundaries
+				    local ii = i + (m - kCenterY)
+				    local jj = j + (n - kCenterX)
+				    if ii >= 0 and ii< M and jj>=0 and jj<N then
+				    	local tmp = out[i*N + j]
+				    	out[i*N + j] = tmp + inp[ii*N + jj] * kernel[m*L + n] --kernel[mm+1][nn+1];
+				    end
+		    	end
+			end
+		end
+  	end
+end
+
 function MTH.timefunctions(typstring,M,N,K,L,...)
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
 	local A = ffi.new(ctyp,M*N) 
 	local B = ffi.new(ctyp,K*L)
+
+	local CR = ffi.new(ctyp,M*N)
 
 	--specific example A
 	generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
@@ -93,8 +115,9 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	end
 	-- printMatrix(B,K,L)
 	
+	printMatrix(A,M,N)
+	printMatrix(B,K,L)
 	
-
 	-- randomizer A
 	-- for m = 0, M-1 do
 	-- 	for n = 0, N-1 do
@@ -130,9 +153,12 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		printMatrix(A,M,N)
 		printMatrix(B,K,L)
 		printMatrix(C,M,N)
-		print("pass 1")
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
-		print("pass 2")
+		
+		-- CORRECTNESS
+		naiveConvolve(CR,A,M,N,B,K,L)
+		-- ASSERT 
+		
 		if i ~= 1 then
 			local C0 = Cs[1]
 			local C1 = Cs[i]
