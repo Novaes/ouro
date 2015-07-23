@@ -249,8 +249,8 @@ if dotune then
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
 					-- same until here
-					local my_conv = genconvolution(b,1,rm,rn,v)
-					-- local my_conv = gennaiveconv()
+					-- local my_conv = genconvolution(b,1,rm,rn,v)
+					local my_conv = gennaiveconv()
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
@@ -275,6 +275,6 @@ if dotune then
 		end
 	end
 end
-
-local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
+local my_convolution = gennaiveconv()
+-- local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
 terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
