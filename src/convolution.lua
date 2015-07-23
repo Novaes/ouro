@@ -114,11 +114,11 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
-		for [mm] = 1, NB-1, RM do
+		for [mm] = 1, M-1, RM do
 			-- how it goes by blocking, it can be greater than NB-1
 			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
 			-- however the generation of the code could not be done first, unless many ifs would be inserted  
-			for [nn]=1, NB-1, RN*V do 
+			for [nn]=1, N-1, RN*V do 
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
@@ -128,8 +128,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				A = A + RN*V
 				C = C + RN*V
 			end
-			if (((NB-2)/(RN*V)) * (RN*V) + 1 < NB-1) then
-				var offset = (((NB-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (NB-1)
+			if (((N-2)/(RN*V)) * (RN*V) + 1 < N-1) then
+				var offset = (((N-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (N-1)
 				A = A - offset
 				C = C - offset
 			end
@@ -138,8 +138,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			C = C + 2
 			A = A + 2
 
-			A = A + RM * ldc - NB
-			C = C + RM * ldc - NB
+			A = A + RM * ldc - M
+			C = C + RM * ldc - M
 		end
 	end
 end
@@ -160,6 +160,29 @@ function blockedloop(M,N,blocksizes,bodyfn)
            		end end end
   end
   return generatelevel(1,0,0,M,N)
+end
+
+function gennaiveconv()
+	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
+		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+		ldc : int, kCenterX: int, kCenterY: int) 
+		var kCenterX : int = K/2
+		var kCenterY : int = L/2
+		for i=1, M-1 do
+		    for j=1, N-1 do
+	        	for m=0, K do
+	          		for n=0,L do
+			            -- boundaries
+			            var ii: int = i + (m - kCenterY)
+			            var jj: int = j + (n - kCenterX)
+			            if ii>=0 and ii<M and jj>=0 and jj<N then
+			              C[i*N + j] = C[i*N + j] + A[ii * N + jj] * B[m * L + n]
+			            end
+		        	end
+		      	end
+		    end
+		end
+	end
 end
 
 function genconvolution(NB,NBF,RM,RN,V)
@@ -217,7 +240,7 @@ local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 5 -- full size of the matrix
+	local tunefor = 100 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
@@ -226,6 +249,7 @@ if dotune then
 				for _,v in ipairs(vectors) do
 						-- same until here
 					local my_conv = genconvolution(b,1,rm,rn,v)
+					-- local my_conv = gennaiveconv()
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()

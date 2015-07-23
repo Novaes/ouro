@@ -71,8 +71,8 @@ end
 
 function naiveConvolve(out, inp, M, N, kernel, K, L)
   local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
-	for i=0, M-1 do
-		for j=0, N-1 do
+	for i= kCenterX, M-kCenterX -1 do -- added border to compare with my result
+		for j=kCenterY, N-kCenterY -1 do
 			out[i*N + j] = 0
 		  	for m=0,K-1 do
 		  		for n=0,L-1 do
@@ -156,7 +156,8 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
 		-- CORRECTNESS
-		naiveConvolve(CR,A,M,N,B,K,L)
+		-- naiveConvolve(CR,A,M,N,B,K,L)
+		-- printMatrix(CR,M,N)
 		-- ASSERT 
 		
 		if i ~= 1 then
