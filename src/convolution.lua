@@ -175,7 +175,7 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local NB2 = NB * NBF
 
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
-	local l1conv0b = genkernel(NB, RM, RN, 1, false, 3, 3, true)
+	local l1conv0b = genkernel(NB, 1, 1, 1, false, 3, 3, true)
 
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
@@ -207,8 +207,8 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {5,10--[[16,24,32,40,48,56,64,1024]]}
-local regblocks = {1,2,3}
+local blocksizes = {5--[[16,24,32,40,48,56,64,1024]]}
+local regblocks = {1,2,3,4,5}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
 
@@ -229,6 +229,7 @@ if dotune then
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
+						-- bellow line makes do not need boundary cases (image multiple of blocksize)
 						local i = math.floor(tunefor / b) * b
 						local curr_gflops = 0
 						local ctyp
