@@ -91,47 +91,31 @@ end
 
 function MTH.timefunctions(typstring,M,N,K,L,...)
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
-	local A = ffi.new(ctyp,M*N) 
+	local cx,cy = math.floor(K/2), math.floor(L/2)
+	local Me, Ne = M+cx, N+cy
+	local A = ffi.new(ctyp,Me*Ne)
 	local B = ffi.new(ctyp,K*L)
+	local CR = ffi.new(ctyp,Me*Ne)
 
-	local CR = ffi.new(ctyp,M*N)
-
-	--specific example A
-	generateA(A, M, N, K+2, L+2) -- A has dimensions 2x the kernel and C 
-	-- printMatrix(A,M,N)
+	for i = cx, Me - cx - 1 do
+		for j = cy, Ne - cy - 1 do
+			A[i*Ne + j] = math.random(1,9)
+		end
+	end
 
 	-- specific examples B
 	if K == 3 then
 		B[0] = 1; B[1] = 2; B[2] = 1;
 		B[3] = 0; B[4] = 0; B[5] = 0;
 		B[6] = -1;B[7] =-2; B[8] = -1;
+	else -- randomizer B
+		for k = 0, K-1 do
+			for l = 0, L-1 do
+				B[k*L + l] = math.random(0,9)
+			end
+		end
 	end
-	if K == 5  then
-		B[0] = 1; B[1] = 4; B[2] = 7; B[3] = 4; B[4] = 1;
-		B[5] = 4; B[6] = 16; B[7] = 26; B[8] = 16; B[9] = 4;
-		B[10] = 7; B[11] = 26; B[12] = 41; B[13] = 26; B[14] = 7;
-		B[15] = 4; B[16] = 16; B[17] = 26; B[18] = 16; B[19] = 4;
-		B[20] = 1; B[21] = 4; B[22] = 7; B[23] = 4; B[24] = 1;
-	end
-	-- printMatrix(B,K,L)
 	
-	printMatrix(A,M,N)
-	printMatrix(B,K,L)
-	
-	-- randomizer A
-	-- for m = 0, M-1 do
-	-- 	for n = 0, N-1 do
-	-- 		A[m*N + n] = math.random(0,9)
-	-- 	end
-	-- end
-
-	-- randomizer B
-	-- for k = 0, K-1 do
-	-- 	for l = 0, L-1 do
-	-- 		B[k*L + l] = math.random(0,9)
-	-- 	end
-	-- end
-
 	local fns = {...}
 	local Cs = {}
 
@@ -150,7 +134,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		local C = Cs[i]
 		local tocall = function() fn(M,N,K,L,A,B,C) end
 		tocall()
-		printMatrix(A,M,N)
+		printMatrix(A,Me,Ne)
 		printMatrix(B,K,L)
 		printMatrix(C,M,N)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop

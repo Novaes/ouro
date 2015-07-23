@@ -62,8 +62,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 
-	for m = 0, RM+1 do
-		for n = 0, RN+1 do
+	for m = 0, RM+math.floor(K/2) do
+		for n = 0, RN+math.floor(L/2) do
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
@@ -114,11 +114,11 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
-		for [mm] = 1, M-1, RM do
+		for [mm] = 0, M, RM do
 			-- how it goes by blocking, it can be greater than NB-1
 			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
 			-- however the generation of the code could not be done first, unless many ifs would be inserted  
-			for [nn]=1, N-1, RN*V do 
+			for [nn]=0, N, RN*V do 
 				[loadc];
 				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
@@ -135,8 +135,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			end
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
-			C = C + 2
-			A = A + 2
+			-- C = C + 2
+			-- A = A + 2
 
 			A = A + RM * ldc - M
 			C = C + RM * ldc - M
@@ -204,9 +204,10 @@ function genconvolution(NB,NBF,RM,RN,V)
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
-
+		var Mpadded = M-1 -- this 1 is K/2
+		var Npadded = N-1 -- L/2
         var args = arrayof(int,0)
-         [ blockedloop(N,M,{NB2,NB},
+         [ blockedloop(Mpadded,Npadded,{NB2,NB},
                 function(m,n) 
                 return quote
                     var MM,NN = min(M-m,NB),min(N-n,NB)
@@ -237,7 +238,7 @@ local vectors = {1}
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
-
+local k = 3
 if dotune then
 	-- local tunefor = 1024
 	local tunefor = 10 -- full size of the matrix
@@ -247,7 +248,7 @@ if dotune then
 		for _,rm in ipairs(regblocks) do
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
-						-- same until here
+					-- same until here
 					local my_conv = genconvolution(b,1,rm,rn,v)
 					-- local my_conv = gennaiveconv()
 					if my_conv then
@@ -257,7 +258,7 @@ if dotune then
 						local i = math.floor(tunefor / b) * b
 						local curr_gflops = 0
 						local ctyp
-						local correct, exectimes = harness.timefunctions(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C)
+						local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
 	                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 						end)
 						if not correct then	print("<error>")  break  end
