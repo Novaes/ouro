@@ -92,7 +92,7 @@ end
 function MTH.timefunctions(typstring,M,N,K,L,...)
 	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
 	local cx,cy = math.floor(K/2), math.floor(L/2)
-	local Me, Ne = M+cx, N+cy
+	local Me, Ne = M+2*cx, N+2*cy
 	local A = ffi.new(ctyp,Me*Ne)
 	local B = ffi.new(ctyp,K*L)
 	local CR = ffi.new(ctyp,Me*Ne)
@@ -121,7 +121,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 
 	-- initialize: fill the matrix C with -1
 	for i,fn in ipairs(fns) do
-		local C = ffi.new(ctyp,M*N)
+		local C = ffi.new(ctyp,Me*Ne)
 		for j = 0, M * N - 1 do 
 			C[j] = 0
 		end	
@@ -132,16 +132,16 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 	local results = {}
 	for i,fn in ipairs(fns) do
 		local C = Cs[i]
-		local tocall = function() fn(M,N,K,L,A,B,C) end
+		local tocall = function() fn(Me,Ne,K,L,A,B,C) end
 		tocall()
 		printMatrix(A,Me,Ne)
 		printMatrix(B,K,L)
-		printMatrix(C,M,N)
+		printMatrix(C,Me,Ne)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
 		-- CORRECTNESS
-		naiveConvolve(CR,A,M,N,B,K,L)
-		printMatrix(CR,M,N)
+		naiveConvolve(CR,A,Me,Ne,B,K,L)
+		printMatrix(CR,Me,Ne)
 		-- ASSERT 
 		
 		if i ~= 1 then

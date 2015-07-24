@@ -54,6 +54,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 		var addr = &data[idx]
 		@VP(addr) = v
 	end
+
 	local cx,cy = math.floor(K/2), math.floor(L/2)
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
 	local sda,lda,ldb,ldc = symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
@@ -62,9 +63,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 
-	for m = 0, RM+cx do
-		for n = 0, RN+cy do
-			
+	for m = 0, RM+2*cx-1 do
+		for n = 0, RN+2*cy-1 do
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
@@ -94,8 +94,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	end
 
 	-- spatial 2D convolution
-	for m = 0, RM-cx do
-		for n = 0, RN-cy do
+	for m = 0, RM-1 do
+		for n = 0, RN-1 do
 			for k=0, K-1 do
 				for l = 0, L-1 do
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
@@ -104,7 +104,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-								[c[m][n]] = [c[m][n]] + [a[x+cx][y+cy]] * [b[k][l]]
+							[c[m][n]] = [c[m][n]] + [a[x+cx][y+cy]] * [b[k][l]]
 						end
 					)
 				end
@@ -134,12 +134,6 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			-- 	A = A - offset
 			-- 	C = C - offset
 			-- end
-
-			-- jump of two (final border one line, initial border next line)
-			-- It is two because the kernel is 3, it would change for different kernel
-			-- C = C + 2
-			-- A = A + 2
-
 			A = A + RM * ldc - M
 			C = C + RM * ldc - M
 		end
@@ -187,7 +181,7 @@ function gennaiveconv()
 	end
 end
 
-function genconvolution(NB,NBF,RM,RN,V)
+function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
 	-- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		-- return false
@@ -195,12 +189,9 @@ function genconvolution(NB,NBF,RM,RN,V)
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
-
-
 	local NB2 = NB * NBF
-
-	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
-	local l1conv0b = genkernel(NB, 1, 1, 1, false, 3, 3, true)
+	local l1conv0 = genkernel(NB, RM, RN, 1, false, K, L, false)
+	local l1conv0b = genkernel(NB, 1, 1, 1, false, K, L, true)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -256,14 +247,14 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {4--[[16,24,32,40,48,56,64,1024]]}
+local blocksizes = {5--[[16,24,32,40,48,56,64,1024]]}
 local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
-local k = 3
+local k = 9
 if dotune then
 	-- local tunefor = 1024
 	local tunefor = 10 -- full size of the matrix
@@ -274,14 +265,13 @@ if dotune then
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
 					-- same until here
-					local my_conv = genconvolution(b,1,rm,rn,v)
+					local my_conv = genconvolution(b,1,rm,rn,v,k,k)
 					-- local my_conv = gennaiveconv()
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
 						-- bellow line makes do not need boundary cases (image multiple of blocksize)
-						-- local i = math.floor(tunefor / b) * b
-						local i = 10
+						local i = math.floor(tunefor / b) * b
 						local curr_gflops = 0
 						local ctyp
 						local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
