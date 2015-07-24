@@ -54,19 +54,22 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 		var addr = &data[idx]
 		@VP(addr) = v
 	end
-
+	local cx,cy = math.floor(K/2), math.floor(L/2)
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
 	local sda,lda,ldb,ldc = symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
-	local a,b,c = symmat("a",RM+2,RN+2), symmat("b",K,L), symmat("c",RM,RN)
+	local a,b,c = symmat("a",RM+2*cx,RN+2*cy), symmat("b",K,L), symmat("c",RM,RN)
 	local kk, ll = symbol("kk"), symbol("ll")
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
 
-	for m = 0, RM+math.floor(K/2) do
-		for n = 0, RN+math.floor(L/2) do
+	for m = 0, RM+cx do
+		for n = 0, RN+cy do
+			
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
+			-- simple load of c also, it is not related with expression above
+			-- objective was just reuse this loop
 			if(m<RM and n<RN) then
 				loadc:insert(quote
 						var [c[m][n]] = alpha * vecload(C, m*ldc + n*V)
@@ -75,6 +78,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					vecstore(C, m*ldc + n, [c[m][n]])
 				end)
 			end
+
 		end
 	end
 
@@ -90,8 +94,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	end
 
 	-- spatial 2D convolution
-	for m = 0, RM-1 do
-		for n = 0, RN-1 do
+	for m = 0, RM-cx do
+		for n = 0, RN-cy do
 			for k=0, K-1 do
 				for l = 0, L-1 do
 					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
@@ -100,10 +104,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-							-- if([mm] + m < NB-1 and [nn] + n < NB-1) then
-								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
-								[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
-							-- end
+								[c[m][n]] = [c[m][n]] + [a[x+cx][y+cy]] * [b[k][l]]
 						end
 					)
 				end
@@ -201,21 +202,20 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
 	local l1conv0b = genkernel(NB, 1, 1, 1, false, 3, 3, true)
 
-	local cx,cy = 1,1
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
-		var Mp = M-cx -- this 1 is K/2
-		var Np = N-cy -- L/2
+		M = M-kCenterX
+		N = N-kCenterY
 
-		for mm = cx,Mp,NB2 do
-			for nn = cy,Np,NB2 do
-				for m = mm,min(mm+NB2,Mp),NB do
-					for n = nn,min(nn+NB2,Np),NB do
-					 	var MM,NN = min(Mp-m,NB),min(Np-n,NB)
+		for mm = kCenterX,M,NB2 do
+			for nn = kCenterY,N,NB2 do
+				for m = mm,min(mm+NB2,M),NB do
+					for n = nn,min(nn+NB2,N),NB do
+					 	var MM,NN = min(M-m,NB),min(N-n,NB)
 	                    var isboundary = MM < NB or NN < NB
-	                    var AA,CC = A + ((m-cx)*lda + (n-cy)),C + (m*ldc + n)
+	                    var AA,CC = A + ((m-kCenterX)*lda + (n-kCenterY)),C + (m*ldc + n)
 	                    if isboundary then -- do not enter here YET
 	                     l1conv0b(AA,
 	                         B,
