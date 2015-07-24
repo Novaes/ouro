@@ -67,12 +67,12 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
-			if(m>=0 and m<RM and n>=0 and n<RN) then
+			if(m<RM and n<RN) then
 				loadc:insert(quote
-						var [c[m][n]] = alpha * vecload(C, (m+1)*ldc + (n+1)*V)
+						var [c[m][n]] = alpha * vecload(C, m*ldc + n*V)
 				end)
 				storec:insert(quote
-					vecstore(C, (m+1)*ldc + (n+1), [c[m][n]])
+					vecstore(C, m*ldc + n, [c[m][n]])
 				end)
 			end
 		end
@@ -100,10 +100,10 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 					calcc:insert(
 						quote
 							-- area regblocking not multiple of the area sizeblocking
-							if([mm] + m < NB-1 and [nn] + n < NB-1) then
+							-- if([mm] + m < NB-1 and [nn] + n < NB-1) then
 								--remeber that taking the pos a[x+1][y+1], e.g. a[0][0] menas take a[-1][-1] necessary for c[0][0]
 								[c[m][n]] = [c[m][n]] + [a[x+1][y+1]] * [b[k][l]]
-							end
+							-- end
 						end
 					)
 				end
@@ -128,11 +128,12 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 				A = A + RN*V
 				C = C + RN*V
 			end
-			if (((N-2)/(RN*V)) * (RN*V) + 1 < N-1) then
-				var offset = (((N-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (N-1)
-				A = A - offset
-				C = C - offset
-			end
+			-- if (((N-2)/(RN*V)) * (RN*V) + 1 < N-1) then
+			-- 	var offset = (((N-2)/(RN*V)) * (RN*V) + 1) + (RN*V)  - (N-1)
+			-- 	A = A - offset
+			-- 	C = C - offset
+			-- end
+
 			-- jump of two (final border one line, initial border next line)
 			-- It is two because the kernel is 3, it would change for different kernel
 			-- C = C + 2
@@ -200,21 +201,21 @@ function genconvolution(NB,NBF,RM,RN,V)
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, 3, 3, false) -- no prefetch, no boundary
 	local l1conv0b = genkernel(NB, 1, 1, 1, false, 3, 3, true)
 
-
+	local cx,cy = 1,1
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
-		var Mp = M-1 -- this 1 is K/2
-		var Np = N-1 -- L/2
+		var Mp = M-cx -- this 1 is K/2
+		var Np = N-cy -- L/2
 
-		for mm = 0,M,NB2 do
-			for nn = 0,N,NB2 do
-				for m = mm,min(mm+NB2,M),NB do
-					for n = nn,min(nn+NB2,N),NB do
-					 	var MM,NN = min(M-m,NB),min(N-n,NB)
+		for mm = cx,Mp,NB2 do
+			for nn = cy,Np,NB2 do
+				for m = mm,min(mm+NB2,Mp),NB do
+					for n = nn,min(nn+NB2,Np),NB do
+					 	var MM,NN = min(Mp-m,NB),min(Np-n,NB)
 	                    var isboundary = MM < NB or NN < NB
-	                    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+	                    var AA,CC = A + ((m-cx)*lda + (n-cy)),C + (m*ldc + n)
 	                    if isboundary then -- do not enter here YET
 	                     l1conv0b(AA,
 	                         B,
@@ -255,7 +256,7 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {5--[[16,24,32,40,48,56,64,1024]]}
+local blocksizes = {4--[[16,24,32,40,48,56,64,1024]]}
 local regblocks = {1}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
@@ -273,13 +274,14 @@ if dotune then
 			for _,rn in ipairs(regblocks) do
 				for _,v in ipairs(vectors) do
 					-- same until here
-					-- local my_conv = genconvolution(b,1,rm,rn,v)
-					local my_conv = gennaiveconv()
+					local my_conv = genconvolution(b,1,rm,rn,v)
+					-- local my_conv = gennaiveconv()
 					if my_conv then
 						print(b,rm,rn,v)
 						my_conv:compile()
 						-- bellow line makes do not need boundary cases (image multiple of blocksize)
-						local i = math.floor(tunefor / b) * b
+						-- local i = math.floor(tunefor / b) * b
+						local i = 10
 						local curr_gflops = 0
 						local ctyp
 						local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
