@@ -1,5 +1,4 @@
 ### Auto-tuner that builds optimized kernels for CNNs ###        
----CHANGE: RUNNING ON SERVER v1.5 (no mt, no vecinstr), best results ---
 
     The three different methods to compute the convolution are each one in their branches: Direct Method (master), Lowering (wip/optlowering) and Convolution by FFT (wip/fastconvolution)
 
