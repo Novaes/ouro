@@ -168,8 +168,8 @@ function gennaiveconv()
 		ldc : int, kCenterX: int, kCenterY: int) 
 		var kCenterX : int = K/2
 		var kCenterY : int = L/2
-		for i=1, M-1 do
-		    for j=1, N-1 do
+		for i=kCenterX, M-kCenterX do
+		    for j=kCenterY, N-kCenterY do
 	        	for m=0, K do
 	          		for n=0,L do
 			            -- boundaries
@@ -204,28 +204,52 @@ function genconvolution(NB,NBF,RM,RN,V)
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
 		ldc : int, kCenterX: int, kCenterY: int) 
-		var Mpadded = M-1 -- this 1 is K/2
-		var Npadded = N-1 -- L/2
-        var args = arrayof(int,0)
-         [ blockedloop(Mpadded,Npadded,{NB2,NB},
-                function(m,n) 
-                return quote
-                    var MM,NN = min(M-m,NB),min(N-n,NB)
-                    var isboundary = MM < NB or NN < NB
-                    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-                    if isboundary then -- do not enter here YET
-                     l1conv0b(AA,
-                         B,
-                         CC,
-                         sda,lda,ldb,ldc,0,MM,NN)
-                    else
-                        l1conv0(AA,
-                         B,
-                         CC,
-                         sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
-                    end
-                end end)  
-            ]       
+
+		var Mp = M-1 -- this 1 is K/2
+		var Np = N-1 -- L/2
+
+		for mm = 0,M,NB2 do
+			for nn = 0,N,NB2 do
+				for m = mm,min(mm+NB2,M),NB do
+					for n = nn,min(nn+NB2,N),NB do
+					 	var MM,NN = min(M-m,NB),min(N-n,NB)
+	                    var isboundary = MM < NB or NN < NB
+	                    var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+	                    if isboundary then -- do not enter here YET
+	                     l1conv0b(AA,
+	                         B,
+	                         CC,
+	                         sda,lda,ldb,ldc,0,MM,NN)
+	                    else
+	                        l1conv0(AA,
+	                         B,
+	                         CC,
+	                         sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+	                    end
+					end
+				end
+			end
+		end
+
+         -- [ blockedloop(M,N,{NB2,NB},
+         --        function(m,n) 
+         --        return quote
+         --            var MM,NN = min(M-m,NB),min(N-n,NB)
+         --            var isboundary = MM < NB or NN < NB
+         --            var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+         --            if isboundary then -- do not enter here YET
+         --             l1conv0b(AA,
+         --                 B,
+         --                 CC,
+         --                 sda,lda,ldb,ldc,0,MM,NN)
+         --            else
+         --                l1conv0(AA,
+         --                 B,
+         --                 CC,
+         --                 sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+         --            end
+         --        end end)  
+         --    ]       
 	end
 end
 
