@@ -46,119 +46,150 @@ function asserteq(C,CR,rows,cols,cx,cy)
 	return true
 end
 
-function printMatrix(m,rows,columns)
-  local matrix = m
-  for i=0,rows-1 do
-    for j=0,columns-1 do
-      io.write(" " .. matrix[i*columns + j])
+function printMatrix(m,rows,columns,depth)
+    local dim = rows * columns
+    if depth > 1 then 
+
+    	-- print each output
+        for d=0,depth-1 do
+            local base = dim * d
+            for i=0,rows-1 do
+                for j=0,columns-1 do
+                    io.write(" " .. m[base + i*columns + j])
+                end
+                io.write("\n")
+            end
+            io.write("\n")
+        end
+
+    else
+        -- usual matrix print
+        for i=0,rows-1 do
+            for j=0,columns-1 do
+              io.write(" " .. m[i*columns + j])
+            end
+            io.write("\n")
+        end
+
     end
-    io.write("\n")
-  end
-  io.write("\n")
 end
 
--- create a 1-9 with 0 padding border, used for test convolution
-function fillpart(A,sM,eM,sN,eN,M,N) 
-	local counter = 0
-	local dim = eN-sN + 1
-	local elems = dim * dim
-	for m = sM, eM do 
-		for n = sN, eN do
-			A[m*N + n] = counter + 1
-			counter = (counter + 1) % elems
-		end
-	end
-end
-
-function generateA(A, M, N, inX, inY)
-	local nRows = M/inX - 1 -- first matrix start from 0
-	local nCols = N/inY - 1
-	for j=0,nRows do
-		for i = 0,nCols do
-			fillpart(A, 1 + j*inY, (inY-2) + j*inY, 1 + i*inX, (inX-2) + i*inX, M, N)
-		end
-	end
-end
-
-function naiveConvolve(out, inp, M, N, kernel, K, L)
-  local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
-	for i= kCenterX, M-kCenterX -1 do -- added border to compare with my result
-		for j=kCenterY, N-kCenterY -1 do
-			out[i*N + j] = 0
-		  	for m=0,K-1 do
-		  		for n=0,L-1 do
-			      	--boundaries
-				    local ii = i + (m - kCenterY)
-				    local jj = j + (n - kCenterX)
-				    if ii >= 0 and ii< M and jj>=0 and jj<N then
-				    	local tmp = out[i*N + j]
-				    	out[i*N + j] = tmp + inp[ii*N + jj] * kernel[m*L + n] --kernel[mm+1][nn+1];
-				    end
-		    	end
-			end
-		end
-  	end
-end
-
-function MTH.timefunctions(typstring,M,N,K,L,...)
-	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
-	local cx,cy = math.floor(K/2), math.floor(L/2)
-	local Me, Ne = M+2*cx, N+2*cy
-	local A = ffi.new(ctyp,Me*Ne)
-	local B = ffi.new(ctyp,K*L)
-	local CR = ffi.new(ctyp,Me*Ne)
-
+function generateTestSet(A,Me,Ne,cx,cy,Bs,K,L,NF)
 	for i = cx, Me - cx - 1 do
 		for j = cy, Ne - cy - 1 do
 			A[i*Ne + j] = math.random(1,9)
 		end
 	end
 
-	-- specific examples B
-	if K == 3 then
-		B[0] = 1; B[1] = 2; B[2] = 1;
-		B[3] = 0; B[4] = 0; B[5] = 0;
-		B[6] = -1;B[7] =-2; B[8] = -1;
-	else -- randomizer B
-		for k = 0, K-1 do
-			for l = 0, L-1 do
-				B[k*L + l] = math.random(0,9)
+	for pos=0,NF -1 do
+		local filter = {}	
+		for i=1, K*L do
+			filter[i] = math.random(1,9)
+		end		
+
+		createFilter(filter,K,L,Bs,pos)
+	end
+
+	-- An option for a three kernels sequence
+	-- createFilter({1,2,1,
+	--               0,0,0,
+	--               -1,-2,-1},K,L,Bs,0) -- edge detection (Sobel)
+
+	-- createFilter({0,-1,0,
+	--               -1,5,-1,
+	--               0,-1,0},K,L,Bs,1) -- sharpen
+
+	-- createFilter({0,0,0,
+	--               0,1,0,
+	--               0,0,0},K,L,Bs,2) -- indentity
+end
+
+function createFilter(filter,rows,columns,m,pos)
+  local base = pos * rows * columns
+  for i=0,rows-1 do
+    for j=0,rows-1 do
+      m[base + i*columns + j] = filter[i*columns + j + 1]   
+      -- io.write(m[i*columns + j])
+    end
+    -- io.write("\n")
+  end
+  -- io.write("\n")
+  return m
+end
+
+function naiveConvolve(out, inp, Me, Ne, kernel, K, L,depth)
+  local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
+  local dim = Me * Ne
+    for d=0,depth-1 do
+        local base = dim * d
+        for i= kCenterX, Me-kCenterX -1 do -- added border to compare with my result
+			for j=kCenterY, Ne-kCenterY -1 do
+				out[base + i*Ne + j] = 0
+			  	for m=0,K-1 do
+			  		for n=0,L-1 do
+				      	--boundaries
+					    local ii = i + (m - kCenterY)
+					    local jj = j + (n - kCenterX)
+					    if ii >= 0 and ii< Me and jj>=0 and jj<Ne then
+					    	local tmp = out[base + i*Ne + j]
+					    	out[base + i*Ne + j] = tmp + inp[base + ii*Ne + jj] * kernel[m*L + n]
+					    end
+			    	end
+				end
 			end
 		end
+        io.write("\n")
 	end
-	
+end
+
+function MTH.timefunctions(typstring,M,N,K,L,depth,...)
+	local ctyp = typstring.."[?] __attribute__((aligned(64)))"
+	local cx,cy = math.floor(K/2), math.floor(L/2)
+	local Me, Ne = M+2*cx, N+2*cy
+	local A = ffi.new(ctyp,Me*Ne)
+	local Bs = ffi.new(ctyp,K*L*depth)
+	local CR = ffi.new(ctyp,Me*Ne*depth)
+
+	generateTestSet(A,Me,Ne,cx,cy,Bs,K,L,depth)
+
 	local fns = {...}
-	local Cs = {}
+	local Cfns = {}
 
 	-- initialize: fill the matrix C with -1
 	for i,fn in ipairs(fns) do
-		local C = ffi.new(ctyp,Me*Ne)
-		for j = 0, M * N - 1 do 
-			C[j] = 0
+		local Cs = ffi.new(ctyp,Me*Ne*depth)
+		for j = 0, Me * Ne * depth - 1 do 
+			Cs[j] = 0
 		end	
-		Cs[i] = C
+		Cfns[i] = Cs
 	end
 
 	-- compute 
 	local results = {}
 	local checked = true
 	for i,fn in ipairs(fns) do
-		local C = Cs[i]
-		local tocall = function() fn(Me,Ne,K,L,A,B,C) end
+		local Cs = Cfns[i] -- 3D
+		local tocall = function() fn(Me,Ne,K,L,A,Bs,Cs) end
 		tocall()
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
 		-- Check correctness to any of the function tested
 		-- In this case I'm testing only the convolution
-		naiveConvolve(CR,A,Me,Ne,B,K,L)
-		checked = asserteq(C,CR,Me,Ne,cx,cy)
-		if checked == false then break end
+		-- naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
+		-- checked = asserteq(Cs,CR,Me,Ne,cx,cy)
+		-- if checked == false then break end
 
 		-- Print in case detailed analysis
-		printMatrix(A,Me,Ne)
-		printMatrix(B,K,L)
-		printMatrix(C,Me,Ne)
-		printMatrix(CR,Me,Ne)
+		print("Inputs")
+		printMatrix(Bs,K,L,depth)
+		printMatrix(A,Me,Ne,0)
+		print("Outputs")
+		printMatrix(Cs,Me,Ne,depth)
+
+		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
+		checked = asserteq(Cs,CR,Me,Ne,cx,cy)
+		if checked == false then break end
+		printMatrix(CR,Me,Ne,depth)
 
 		if i ~= 1 then
 			local C0 = Cs[1]

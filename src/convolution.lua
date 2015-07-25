@@ -30,7 +30,7 @@ function printMatrix(m,rows,columns)
 end
 
 -- generate L1 convolution 
-function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
+function genkernel(NB, RM, RN, V, prefetch, K, L, depth, boundary)
 	local M,N, boundaryargs
 	-- if one of the parameters is lower than NB then receive the usual
 	if boundary then 
@@ -68,46 +68,51 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			loadA:insert(quote
 					var [a[m][n]] = vecload(A, m*ldc + n*V)
 			end)
-			-- simple load of c also, it is not related with expression above
-			-- objective was just reuse this loop
-			if(m<RM and n<RN) then
-				loadc:insert(quote
-						-- sda*lda*i is the base when processing multiple kernel results
-						var [c[m][n][n]] = alpha * vecload(C, sda*lda*i  + m*ldc + n*V)
-				end)
-				storec:insert(quote
-					vecstore(C, m*ldc + n, [c[m][n]])
-				end)
-			end
-
 		end
 	end
 
+	for  i=0, depth-1 do
+		for m=0,RM -1 do
+			for n=0,RN -1 do
+				loadc:insert(quote
+						-- sda*lda*i is the base when processing multiple kernel results
+						var [c[i][m][n]] = alpha * vecload(C, sda*lda*i  + m*ldc + n*V)
+				end)
+				storec:insert(quote
+					vecstore(C, m*ldc + n, [c[i][m][n]])
+				end)
+			end
+		end
+	end
 	local calcc = terralib.newlist()
 
 	-- load full kernel
-	for  k=0, K-1 do
-		for l = 0, L-1 do
-			loadkernel:insert(quote
-				var [b[k][l]] = vecload(B, k*ldb + l*V)
-			end)
+	for  i=0, depth-1 do
+		for  k=0, K-1 do
+			for l = 0, L-1 do
+				loadkernel:insert(quote
+					var [b[i][k][l]] = vecload(B, ldb*ldb*i  + k*ldb + l*V)
+				end)
+			end
 		end
 	end
 
 	-- spatial 2D convolution
-	for m = 0, RM-1 do
-		for n = 0, RN-1 do
-			for k=0, K-1 do
-				for l = 0, L-1 do
-					-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
-					x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
-					--no boundary cases
-					calcc:insert(
-						quote
+	for i=0,depth-1 do -- multiple kernel
+		for m = 0, RM-1 do
+			for n = 0, RN-1 do
+				for k=0, K-1 do
+					for l = 0, L-1 do
+						-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
+						x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
+						--no boundary cases
+						calcc:insert(
+							quote
 							-- area regblocking not multiple of the area sizeblocking
-							[c[m][n]] = [c[m][n]] + [a[x+cx][y+cy]] * [b[k][l]]
-						end
-					)
+							[c[i][m][n]] = [c[i][m][n]] + [a[x+cx][y+cy]] * [b[i][k][l]]
+							end
+						)
+					end
 				end
 			end
 		end
@@ -116,13 +121,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
+		[loadkernel];
 		for [mm] = 0, M, RM do
 			-- how it goes by blocking, it can be greater than NB-1
 			-- the correct for blocking would be use min([nn]+RN*V,NB-1), 
 			-- however the generation of the code could not be done first, unless many ifs would be inserted  
 			for [nn]=0, N, RN*V do 
 				[loadc];
-				[loadkernel];
 				llvmprefetch(A + sda*lda,0,3,1);
 				[loadA];
 				[calcc];
@@ -182,7 +187,7 @@ function gennaiveconv()
 	end
 end
 
-function genconvolution(NB,NBF,RM,RN,V,K,L)
+function genconvolution(NB,NBF,RM,RN,V,K,L,NF)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
 	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		print("3rd level blocksizes must be a multiple of the 2nd")
@@ -192,8 +197,8 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
 	local NB2 = NB * NBF
-	local l1conv0 = genkernel(NB, RM, RN, 1, false, K, L, false)
-	local l1conv0b = genkernel(NB, 1, 1, 1, false, K, L, true)
+	local l1conv0 = genkernel(NB, RM, RN, 1, false, K, L, NF, false)
+	local l1conv0b = genkernel(NB, 1, 1, 1, false, K, L, NF, true)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
 		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
@@ -255,9 +260,9 @@ local regblocks = {1}--,2,4,8}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1} 
 local filters = {3}
-local nfilter = {1,2,3}
+local nfilter = {1}
 -- initialized (defined structure of best)
-local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = f }
+local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 
 if dotune then
 	local tunefor = 8 -- full size of the matrix
@@ -279,7 +284,7 @@ if dotune then
 									local i = math.floor(tunefor / b) * b
 									local curr_gflops = 0
 									local ctyp
-									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
+									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(M,N,K,L,A,B,C)
 				                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2 
 									end)
 									if not correct then	print("<error>")  break  end
