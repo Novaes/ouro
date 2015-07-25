@@ -1,5 +1,6 @@
 local IO = terralib.includec("stdio.h")
 local stdlib = terralib.includec("stdlib.h")
+-- Set number to float in case of Single Float Point tests
 local number = double
 
 
@@ -8,7 +9,7 @@ local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} ->
 
 local dotune = true
 
--- terra naivel1conv(A : &double, B : &double, C : &double, lda : int, ldb : int, ldc : int, alpha : double)
+-- terra naivel1conv(A : &number, B : &number, C : &number, lda : int, ldb : int, ldc : int, alpha : number)
 function symmat(name,I,...)
 	if not I then return symbol(name) end
 	local r = {}
@@ -44,13 +45,13 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, depth, boundary)
 	-- assets NB/RM and NB/RN do not necessary
 	-- print("parameters: "..NB .." ".. RM .." ".. RN .." ".. V .." ".. K .." ".. L)
 
-	local VP = &vector(double,V)
-	local terra vecload(data : &double, idx : int)
+	local VP = &vector(number,V)
+	local terra vecload(data : &number, idx : int)
 		var addr = &data[idx]
 		return @VP(addr)
 	end
 
-	local terra vecstore(data : &double, idx : int, v : vector(double,V))
+	local terra vecstore(data : &number, idx : int, v : vector(number,V))
 		var addr = &data[idx]
 		@VP(addr) = v
 	end
@@ -118,7 +119,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, depth, boundary)
 		end
 	end
 
-	return terra([A] : &double, [B] : &double, [C] : &double, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : double, [boundaryargs])
+	return terra([A] : &number, [B] : &number, [C] : &number, [sda] : int, [lda] : int, [ldb] : int, [ldc] : int, [alpha] : number, [boundaryargs])
 		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
 		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
 		[loadkernel];
@@ -165,8 +166,8 @@ function blockedloop(M,N,blocksizes,bodyfn)
 end
 
 function gennaiveconv()
-	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
-		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, 
+		alpha : number, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 		var kCenterX : int = K/2
 		var kCenterY : int = L/2
@@ -200,8 +201,8 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,NF)
 	local l1conv0 = genkernel(NB, RM, RN, 1, false, K, L, NF, false)
 	local l1conv0b = genkernel(NB, 1, 1, 1, false, K, L, NF, true)
 
-	return terra(gettime : {} -> double, M : int, N : int, K : int, L: int, 
-		alpha : double, A : &double, sda: int, lda : int, B : &double, ldb : int, C : &double, 
+	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, 
+		alpha : number, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number, 
 		ldc : int, kCenterX: int, kCenterY: int) 
 
 		M = M-kCenterX
