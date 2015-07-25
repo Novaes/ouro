@@ -248,7 +248,7 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {4--[[16,24,32,40,48,56,64,1024]]}
+local blocksizes = {16,24,32,40,48,56,64}
 local regblocks = {1,2,4}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
@@ -257,40 +257,39 @@ local vectors = {1}
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 local k = 3
 if dotune then
-	-- local tunefor = 1024
-	local tunefor = 8 -- full size of the matrix
+	local tunefor = 1024 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-	for _,b in ipairs(blocksizes) do
-		for _,rm in ipairs(regblocks) do
-			for _,rn in ipairs(regblocks) do
-				for _,v in ipairs(vectors) do
-					-- same until here
-					local my_conv = genconvolution(b,1,rm,rn,v,k,k)
-					-- local my_conv = gennaiveconv()
-					if my_conv then
-						print(b,rm,rn,v)
-						my_conv:compile()
-						-- bellow line makes do not need boundary cases (image multiple of blocksize)
-						local i = math.floor(tunefor / b) * b
-						local curr_gflops = 0
-						local ctyp
-						local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
-	                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-						end)
-						if not correct then	print("<error>")  break  end
-						print(i,unpack (exectimes))
-						local curr_gflops = exectimes[1]
-						-- print(curr_gflops) -- print analysis 
-						if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-							best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-							terralib.tree.printraw(best)
+		for _,b in ipairs(blocksizes) do
+			for _,rm in ipairs(regblocks) do
+				for _,rn in ipairs(regblocks) do
+					for _,v in ipairs(vectors) do
+						-- same until here
+						local my_conv = genconvolution(b,1,rm,rn,v,k,k)
+						-- local my_conv = gennaiveconv()
+						if my_conv then
+							print(b,rm,rn,v)
+							my_conv:compile()
+							-- bellow line makes do not need boundary cases (image multiple of blocksize)
+							local i = math.floor(tunefor / b) * b
+							local curr_gflops = 0
+							local ctyp
+							local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
+		                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+							end)
+							if not correct then	print("<error>")  break  end
+							print(i,unpack (exectimes))
+							local curr_gflops = exectimes[1]
+							-- print(curr_gflops) -- print analysis 
+							if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+								best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
+								terralib.tree.printraw(best)
+							end
 						end
 					end
 				end
 			end
 		end
-	end
 end
 local my_convolution = gennaiveconv()
 -- local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)

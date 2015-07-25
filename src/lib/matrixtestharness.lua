@@ -10,11 +10,11 @@ function CalcTime(fn)
 	local begin = terralib.currenttimeinseconds()
 	local current
 	local times = 0
-	-- repeat
+	repeat
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	-- until (current - begin) > 0.2
+	until (current - begin) > 0.2
 	return (current - begin - adjust*times) / times 
 end
 
