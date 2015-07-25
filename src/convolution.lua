@@ -58,7 +58,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 	local cx,cy = math.floor(K/2), math.floor(L/2)
 	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
 	local sda,lda,ldb,ldc = symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
-	local a,b,c = symmat("a",RM+2*cx,RN+2*cy), symmat("b",K,L), symmat("c",RM,RN)
+	local a,b,c = symmat("a",RM+2*cx,RN+2*cy), symmat("b",depth,K,L), symmat("c",depth,RM,RN)
 	local kk, ll = symbol("kk"), symbol("ll")
 	local x,y = symbol("x"), symbol("y")
 	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
@@ -72,7 +72,8 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, boundary)
 			-- objective was just reuse this loop
 			if(m<RM and n<RN) then
 				loadc:insert(quote
-						var [c[m][n]] = alpha * vecload(C, m*ldc + n*V)
+						-- sda*lda*i is the base when processing multiple kernel results
+						var [c[m][n][n]] = alpha * vecload(C, sda*lda*i  + m*ldc + n*V)
 				end)
 				storec:insert(quote
 					vecstore(C, m*ldc + n, [c[m][n]])
@@ -247,15 +248,17 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 end
 
 -- Different blocksizes for the same result implies in padding overheading 
--- for small blocks
+-- ending in s means SIZE
+-- starting with n, means NUMBER
 local blocksizes = {8}--16,24,32,40,48,56,64}
 local regblocks = {1}--,2,4,8}
 -- local vectors = {1,2,4,8,16}
-local vectors = {1}
-
+local vectors = {1} 
+local filters = {3}
+local nfilter = {1,2,3}
 -- initialized (defined structure of best)
-local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
-local k = 3
+local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = f }
+
 if dotune then
 	local tunefor = 8 -- full size of the matrix
 	--change for 10 later
@@ -264,26 +267,30 @@ if dotune then
 			for _,rm in ipairs(regblocks) do
 				for _,rn in ipairs(regblocks) do
 					for _,v in ipairs(vectors) do
-						-- same until here
-						local my_conv = genconvolution(b,1,rm,rn,v,k,k)
-						-- local my_conv = gennaiveconv()
-						if my_conv then
-							print(b,rm,rn,v)
-							my_conv:compile()
-							-- bellow line makes do not need boundary cases (image multiple of blocksize)
-							local i = math.floor(tunefor / b) * b
-							local curr_gflops = 0
-							local ctyp
-							local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
-		                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-							end)
-							if not correct then	print("<error>")  break  end
-							print(i,unpack (exectimes))
-							local curr_gflops = exectimes[1]
-							-- print(curr_gflops) -- print analysis 
-							if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-								best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-								terralib.tree.printraw(best)
+						for _,f in ipairs(nfilter) do
+							for _,k in ipairs(filters) do
+								-- same until here
+								local my_conv = genconvolution(b,1,rm,rn,v,k,k,f)
+								-- local my_conv = gennaiveconv()
+								if my_conv then
+									print(b,rm,rn,v,k,f)
+									my_conv:compile()
+									-- bellow line makes do not need boundary cases (image multiple of blocksize)
+									local i = math.floor(tunefor / b) * b
+									local curr_gflops = 0
+									local ctyp
+									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k, function(M,N,K,L,A,B,C)
+				                    	my_conv(nil,M,N,K,L,1.0,A,M,N,B,L,C,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2 
+									end)
+									if not correct then	print("<error>")  break  end
+									print(i,unpack (exectimes))
+									local curr_gflops = exectimes[1]
+									-- print(curr_gflops) -- print analysis 
+									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+										best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
+										terralib.tree.printraw(best)
+									end
+								end
 							end
 						end
 					end
