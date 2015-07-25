@@ -79,7 +79,7 @@ function genkernel(NB, RM, RN, V, prefetch, K, L, depth, boundary)
 						var [c[i][m][n]] = alpha * vecload(C, sda*lda*i  + m*ldc + n*V)
 				end)
 				storec:insert(quote
-					vecstore(C, m*ldc + n, [c[i][m][n]])
+					vecstore(C, sda*lda*i + m*ldc + n, [c[i][m][n]])
 				end)
 			end
 		end
@@ -259,8 +259,8 @@ local blocksizes = {8}--16,24,32,40,48,56,64}
 local regblocks = {1}--,2,4,8}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1} 
-local filters = {3}
-local nfilter = {1}
+local filters = {3,5}
+local nfilter = {1,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 

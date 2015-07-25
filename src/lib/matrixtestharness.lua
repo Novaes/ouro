@@ -36,8 +36,8 @@ local MTH = {}
 -- end
 
 function asserteq(C,CR,rows,cols,cx,cy)
-	for i = cx, rows - cx - 1 do
-		for j = cy, cols - cy - 1 do
+	for i = 0, rows -1 do
+		for j = 0, cols -1 do
 			if(C[i*cols + j] ~= CR[i*cols + j]) then
 				return false
 			end
@@ -70,8 +70,8 @@ function printMatrix(m,rows,columns,depth)
             end
             io.write("\n")
         end
-
     end
+    io.write("\n")
 end
 
 function generateTestSet(A,Me,Ne,cx,cy,Bs,K,L,NF)
@@ -119,26 +119,27 @@ end
 
 function naiveConvolve(out, inp, Me, Ne, kernel, K, L,depth)
   local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
-  local dim = Me * Ne
+  local dimOut = Me * Ne
+  local dimKer = K*L
     for d=0,depth-1 do
-        local base = dim * d
+        local baseOut = dimOut * d
+        local baseKer = dimKer * d
         for i= kCenterX, Me-kCenterX -1 do -- added border to compare with my result
 			for j=kCenterY, Ne-kCenterY -1 do
-				out[base + i*Ne + j] = 0
+				out[baseOut + i*Ne + j] = 0
 			  	for m=0,K-1 do
 			  		for n=0,L-1 do
 				      	--boundaries
 					    local ii = i + (m - kCenterY)
 					    local jj = j + (n - kCenterX)
 					    if ii >= 0 and ii< Me and jj>=0 and jj<Ne then
-					    	local tmp = out[base + i*Ne + j]
-					    	out[base + i*Ne + j] = tmp + inp[base + ii*Ne + jj] * kernel[m*L + n]
+					    	local tmp = out[baseOut + i*Ne + j]
+					    	out[baseOut + i*Ne + j] = tmp + inp[ii*Ne + jj] * kernel[baseKer + m*L + n]
 					    end
 			    	end
 				end
 			end
 		end
-        io.write("\n")
 	end
 end
 
@@ -173,23 +174,21 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		tocall()
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
+		-- Print in case detailed analysis
+		-- print("Inputs")
+		-- printMatrix(Bs,K,L,depth)
+		-- printMatrix(A,Me,Ne,0)
+		-- print("Outputs")
+		-- printMatrix(Cs,Me,Ne,depth)
+		
 		-- Check correctness to any of the function tested
 		-- In this case I'm testing only the convolution
-		-- naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
-		-- checked = asserteq(Cs,CR,Me,Ne,cx,cy)
-		-- if checked == false then break end
-
-		-- Print in case detailed analysis
-		print("Inputs")
-		printMatrix(Bs,K,L,depth)
-		printMatrix(A,Me,Ne,0)
-		print("Outputs")
-		printMatrix(Cs,Me,Ne,depth)
-
+		
+		-- print("Correctness")
 		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		checked = asserteq(Cs,CR,Me,Ne,cx,cy)
 		if checked == false then break end
-		printMatrix(CR,Me,Ne,depth)
+		-- printMatrix(CR,Me,Ne,depth)
 
 		if i ~= 1 then
 			local C0 = Cs[1]
