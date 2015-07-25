@@ -155,10 +155,10 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 		if checked == false then break end
 
 		-- Print in case detailed analysis
-		-- printMatrix(A,Me,Ne)
-		-- printMatrix(B,K,L)
-		-- printMatrix(C,Me,Ne)
-		-- printMatrix(CR,Me,Ne)
+		printMatrix(A,Me,Ne)
+		printMatrix(B,K,L)
+		printMatrix(C,Me,Ne)
+		printMatrix(CR,Me,Ne)
 
 		if i ~= 1 then
 			local C0 = Cs[1]

@@ -248,8 +248,8 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {16,24,32,40,48,56,64}
-local regblocks = {1,2,4}
+local blocksizes = {8}--16,24,32,40,48,56,64}
+local regblocks = {1}--,2,4,8}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
 
@@ -257,7 +257,7 @@ local vectors = {1}
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
 local k = 3
 if dotune then
-	local tunefor = 1024 -- full size of the matrix
+	local tunefor = 8 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 		for _,b in ipairs(blocksizes) do
