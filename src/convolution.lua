@@ -183,9 +183,10 @@ end
 
 function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- register blocking does not need to be a a multiple of the blocksize anymore
-	-- if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
-		-- return false
-	-- end
+	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
+		print("3rd level blocksizes must be a multiple of the 2nd")
+		return false
+	end
 
 	--5 times NB minimum by dgemm
 	--local NB2 = NBF * NB
@@ -247,17 +248,17 @@ end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- for small blocks
-local blocksizes = {5--[[16,24,32,40,48,56,64,1024]]}
-local regblocks = {1}
+local blocksizes = {4--[[16,24,32,40,48,56,64,1024]]}
+local regblocks = {1,2,4}
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
 
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
-local k = 9
+local k = 3
 if dotune then
 	-- local tunefor = 1024
-	local tunefor = 10 -- full size of the matrix
+	local tunefor = 8 -- full size of the matrix
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do

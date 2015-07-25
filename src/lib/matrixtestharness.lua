@@ -35,6 +35,17 @@ local MTH = {}
 -- 	--acc.cblas_dgemm(101,111,111,M,N,K,1.0,A,K,B,N,0.0,C,N)
 -- end
 
+function asserteq(C,CR,rows,cols,cx,cy)
+	for i = cx, rows - cx - 1 do
+		for j = cy, cols - cy - 1 do
+			if(C[i*cols + j] ~= CR[i*cols + j]) then
+				return false
+			end
+		end
+	end
+	return true
+end
+
 function printMatrix(m,rows,columns)
   local matrix = m
   for i=0,rows-1 do
@@ -130,20 +141,25 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 
 	-- compute 
 	local results = {}
+	local checked = true
 	for i,fn in ipairs(fns) do
 		local C = Cs[i]
 		local tocall = function() fn(Me,Ne,K,L,A,B,C) end
 		tocall()
-		printMatrix(A,Me,Ne)
-		printMatrix(B,K,L)
-		printMatrix(C,Me,Ne)
 		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
-		-- CORRECTNESS
+		-- Check correctness to any of the function tested
+		-- In this case I'm testing only the convolution
 		naiveConvolve(CR,A,Me,Ne,B,K,L)
-		printMatrix(CR,Me,Ne)
-		-- ASSERT 
-		
+		checked = asserteq(C,CR,Me,Ne,cx,cy)
+		if checked == false then break end
+
+		-- Print in case detailed analysis
+		-- printMatrix(A,Me,Ne)
+		-- printMatrix(B,K,L)
+		-- printMatrix(C,Me,Ne)
+		-- printMatrix(CR,Me,Ne)
+
 		if i ~= 1 then
 			local C0 = Cs[1]
 			local C1 = Cs[i]
@@ -158,7 +174,7 @@ function MTH.timefunctions(typstring,M,N,K,L,...)
 			end
 		end
 	end
-	return true,results
+	return checked,results
 end
 
 function MTH.comparetoaccelerate(NB,myfn)
