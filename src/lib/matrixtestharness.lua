@@ -185,10 +185,10 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		-- In this case I'm testing only the convolution
 
 		-- print("Naive")
-		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		-- printMatrix(CR,M,N,depth)
 
 		-- CHECK CORRECTNESS
+		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		checked = asserteq(Cs,CR,M,N,depth)
 		if checked == false then break end
 		
