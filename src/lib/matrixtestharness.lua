@@ -4,8 +4,6 @@ if ffi.os == "Windows" then
 end
 local adjust = 0
 
--- ffi.load("/System/Library/Frameworks/Accelerate.framework/Accelerate")
-
 function CalcTime(fn)
 	local begin = terralib.currenttimeinseconds()
 	local current
@@ -18,13 +16,10 @@ function CalcTime(fn)
 	return (current - begin - adjust*times) / times 
 end
 
--- local terra empty() end
--- adjust = CalcTime(empty) --calculate function call overhead and subtract from tests
-
 local MTH = {}
 
+
 -- find a standard convolution and make it here
--- local acc = terralib.includecstring[[
 -- 	void cblas_dgemm(int, int,
 --                  int, const int M, const int N,
 --                  const int K, const double alpha, const double *A,
@@ -34,16 +29,19 @@ local MTH = {}
 -- local function referenceconv(M,N,K,L,A,B,C)
 -- 	--acc.cblas_dgemm(101,111,111,M,N,K,1.0,A,K,B,N,0.0,C,N)
 -- end
-
-function asserteq(C,CR,rows,cols,cx,cy)
-	for i = 0, rows -1 do
-		for j = 0, cols -1 do
-			if(C[i*cols + j] ~= CR[i*cols + j]) then
-				return false
-			end
-		end
-	end
-	return true
+function asserteq(C,CR,rows,cols,depth)
+	local dim = rows * cols
+    for d=0,depth-1 do
+        local base = dim * d
+        for i=0,rows-1 do
+            for j=0,cols-1 do
+        		if(C[base + i*cols + j] ~= CR[base + i*cols + j]) then
+					return false
+				end
+            end
+        end
+    end
+    return true
 end
 
 function printMatrix(m,rows,columns,depth)
@@ -119,25 +117,25 @@ end
 
 function naiveConvolve(out, inp, Me, Ne, kernel, K, L,depth)
   local kCenterX, kCenterY = math.floor(K/2), math.floor(L/2)
-  local dimOut = Me * Ne
   local dimKer = K*L
+  local e = 0
     for d=0,depth-1 do
-        local baseOut = dimOut * d
         local baseKer = dimKer * d
         for i= kCenterX, Me-kCenterX -1 do -- added border to compare with my result
 			for j=kCenterY, Ne-kCenterY -1 do
-				out[baseOut + i*Ne + j] = 0
+				out[e] = 0
 			  	for m=0,K-1 do
 			  		for n=0,L-1 do
 				      	--boundaries
 					    local ii = i + (m - kCenterY)
 					    local jj = j + (n - kCenterX)
 					    if ii >= 0 and ii< Me and jj>=0 and jj<Ne then
-					    	local tmp = out[baseOut + i*Ne + j]
-					    	out[baseOut + i*Ne + j] = tmp + inp[ii*Ne + jj] * kernel[baseKer + m*L + n]
+					    	local tmp = out[e]
+					    	out[e] = tmp + inp[ii*Ne + jj] * kernel[baseKer + m*L + n]
 					    end
 			    	end
 				end
+				e = e + 1
 			end
 		end
 	end
@@ -149,8 +147,8 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 	local Me, Ne = M+2*cx, N+2*cy
 	local A = ffi.new(ctyp,Me*Ne)
 	local Bs = ffi.new(ctyp,K*L*depth)
-	local CR = ffi.new(ctyp,Me*Ne*depth)
-
+	local CR = ffi.new(ctyp,M*N*depth)
+	
 	generateTestSet(A,Me,Ne,cx,cy,Bs,K,L,depth)
 
 	local fns = {...}
@@ -158,8 +156,8 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 
 	-- initialize: fill the matrix C with -1
 	for i,fn in ipairs(fns) do
-		local Cs = ffi.new(ctyp,Me*Ne*depth)
-		for j = 0, Me * Ne * depth - 1 do 
+		local Cs = ffi.new(ctyp,M*N*depth)
+		for j = 0, M * N * depth - 1 do 
 			Cs[j] = 0
 		end	
 		Cfns[i] = Cs
@@ -167,29 +165,34 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 
 	-- compute 
 	local results = {}
-	local checked = true
+	local checked = false
 	for i,fn in ipairs(fns) do
 		local Cs = Cfns[i] -- 3D
-		local tocall = function() fn(Me,Ne,K,L,A,Bs,Cs) end
+		local tocall = function() fn(Me,Ne,K,L,M,N,A,Bs,Cs,depth) end
+
 		tocall()
-		results[i] = M*N*K*L*2.0*1e-9 / CalcTime(tocall) -- gflop
+		results[i] = M*N*K*L*depth*2.0*1e-9 / CalcTime(tocall) -- gflop
 		
 		-- Print in case detailed analysis
-		-- print("Inputs")
-		-- printMatrix(Bs,K,L,depth)
+		-- print("Image:")
 		-- printMatrix(A,Me,Ne,0)
+		-- print("Kernels:")
+		-- printMatrix(Bs,K,L,depth)
 		-- print("Outputs")
-		-- printMatrix(Cs,Me,Ne,depth)
+		-- printMatrix(Cs,M,N,depth)
 		
 		-- Check correctness to any of the function tested
 		-- In this case I'm testing only the convolution
-		
-		-- print("Correctness")
-		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
-		checked = asserteq(Cs,CR,Me,Ne,cx,cy)
-		if checked == false then break end
-		-- printMatrix(CR,Me,Ne,depth)
 
+		-- print("Naive")
+		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
+		-- printMatrix(CR,M,N,depth)
+
+		-- CHECK CORRECTNESS
+		checked = asserteq(Cs,CR,M,N,depth)
+		if checked == false then break end
+		
+		-- Print in case detailed analysis
 		if i ~= 1 then
 			local C0 = Cs[1]
 			local C1 = Cs[i]
@@ -205,22 +208,6 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		end
 	end
 	return checked,results
-end
-
-function MTH.comparetoaccelerate(NB,myfn)
-	for i = NB, math.huge, NB do
-		local m,n,k = i,i,i
-		io.write(("%d %d %d "):format(m,n,k))
-		local s,r = MTH.timefunctions("double",m,n,k,referenceconv,myfn)
-		if s then
-			print(unpack(r))
-		else
-			print(" <error> ")
-		end
-		if m*n + m*k + n*k > 3*1024*1024 then
-			break
-		end
-	end
 end
 
 return MTH
