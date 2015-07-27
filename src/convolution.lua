@@ -1,6 +1,6 @@
-local IO = terralib.includec("stdio.h")
+local gemm = require("gemm")
+local cstdio = terralib.includec("stdio.h")
 local stdlib = terralib.includec("stdlib.h")
-
 -- Set number to float in case of Single Float Point tests
 local number = double
 
@@ -31,161 +31,23 @@ function printMatrix(m,rows,columns)
   io.write("\n")
 end
 
--- generate L1 convolution 
-function genkernel(NB, RM, RN, V, prefetch, K, L, depth, boundary)
-	local M,N, boundaryargs
-	-- if one of the parameters is lower than NB then receive the usual
-	if boundary then 
-		M,N = symbol(int64,"M"),symbol(int64,"N")
-		boundaryargs = terralib.newlist({M,N})
-	else
-		boundaryargs = terralib.newlist()
-		M,N = NB,NB
-	end
+-- terra min(a : int, b : int)
+-- 	return terralib.select(a < b, a, b)
+-- end
 
-	local cx,cy = math.floor(K/2), math.floor(L/2)
-	local A,B,C,mm,nn,alpha = symbol("A"),symbol("B"),symbol("C"),symbol("mn"),symbol("nn"),symbol("alpha")
-	local sdc,ldc,sda,lda,ldb = symbol("sdc"),symbol("sda"),symbol("lda"),symbol("ldb"), symbol("ldc")
-	local a,b,c = symmat("a",RM+2*cx,RN+2*cy), symmat("b",depth,K,L), symmat("c",depth,RM,RN)
-	local kk, ll = symbol("kk"), symbol("ll")
-	local x,y = symbol("x"), symbol("y")
-	local loadkernel,loadA,loadc,storec = terralib.newlist(),terralib.newlist(),terralib.newlist(),terralib.newlist()
-
-	for m = 0, RM+2*cx-1 do
-		for n = 0, RN+2*cy-1 do
-			loadA:insert(quote
-					var [a[m][n]] = A[m*lda + n]
-			end)
-		end
-	end
-
-	for  i=0, depth-1 do
-		for m=0,RM -1 do
-			for n=0,RN -1 do
-				loadc:insert(quote
-						-- sda*lda*i is the base when processing multiple kernel results
-						var [c[i][m][n]] = alpha * C[sdc*ldc*i  + m*ldc + n]
-				end)
-				storec:insert(quote
-					C[sdc*ldc*i + m*ldc + n] = [c[i][m][n]]
-				end)
-			end
-		end
-	end
-	local calcc = terralib.newlist()
-
-	-- load full kernel
-	for  i=0, depth-1 do
-		for  k=0, K-1 do
-			for l = 0, L-1 do
-				loadkernel:insert(quote
-					-- squared kernels: ldb*ldb; so K == L
-					var [b[i][k][l]] = B[ldb*ldb*i  + k*ldb + l]
-				end)
-			end
-		end
-	end
-
-	-- spatial 2D convolution
-	for i=0,depth-1 do -- multiple kernel
-		for m = 0, RM-1 do
-			for n = 0, RN-1 do
-				for k=0, K-1 do
-					for l = 0, L-1 do
-						-- would sum mm or nn, but this position is realtive to this mini-block (rm, rn)
-						x, y = m + (k - math.floor(K/2) ), n + (l - math.floor(L/2))
-						--no boundary cases
-						calcc:insert(
-							quote
-								-- area regblocking not multiple of the area sizeblocking
-								[c[i][m][n]] = [c[i][m][n]] + [a[x+cx][y+cy]] * [b[i][k][l]]
-							end
-						)
-					end
-				end
-			end
-		end
-	end
-
-	return terra([A] : &number, [B] : &number, [C] : &number, [sda] : int, [lda] : int, [ldb] : int, [sdc] : int, [ldc] : int, [alpha] : number, [boundaryargs])
-		-- no borders, original from 0 to NB-1 (it is in TERRA, exclusive loop)
-		-- If the kernel is different from 3x3, started indices and pointers updates will change (it can be generalized)
-		[loadkernel];
-		for [mm] = 0, M, RM do
-			-- how it goes by blocking, it can be greater than NB-1
-			-- the correct for blocking would be use min([nn]+RN,NB-1), 
-			-- however the generation of the code could not be done first, unless many ifs would be inserted  
-			for [nn]=0, N, RN do 
-				[loadc];
-				llvmprefetch(A + sda*lda,0,3,1);
-				[loadA];
-				[calcc];
-				[storec];
-				A = A + RN
-				C = C + RN
-			end
-			-- if (((N-2)/(RN)) * (RN) + 1 < N-1) then
-			-- 	var offset = (((N-2)/(RN)) * (RN) + 1) + (RN)  - (N-1)
-			-- 	A = A - offset
-			-- 	C = C - offset
-			-- end
-			A = A + RM * lda - M
-			C = C + RM * ldc - M
-		end
-	end
-end
-
-terra min(a : int, b : int)
-	return terralib.select(a < b, a, b)
-end
-
-function blockedloop(M,N,blocksizes,bodyfn)
-  local function generatelevel(n,ii,jj,bb0,bb1)
-    if n > #blocksizes then
-      return bodyfn(ii,jj)
-    end
-    local blocksize = blocksizes[n]
-    return quote for i = ii,min(ii+bb0,M),blocksize do
-                   for j = jj,min(jj+bb1,N),blocksize do
-                        [ generatelevel(n+1,i,j,blocksize,blocksize) ]
-           		end end end
-  end
-  return generatelevel(1,0,0,M,N)
-end
-
-function maxreuse()
-
-	return terra(gettime : {} -> number, Me : int, Ne : int, K : int, L: int, 
-		alpha : number, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number, 
-		sdc : int, ldc : int, kCenterX: int, kCenterY: int, depth : int) 
-
-		var dimKer : int = K*L
-		var dimOut : int = sdc*ldc
-		var kCenterX : int = K/2
-		var kCenterY : int = L/2
-		var e = 0
-		for i=kCenterX, Me-kCenterX do
-		    for j=kCenterY, Ne-kCenterY do
-		    	for d=0, depth do
-					var baseKer = dimKer * d
-					var baseOut = dimOut * d
-			    	C[baseOut + e] = 0
-		        	for m=0, K do
-		          		for n=0,L do
-				            -- boundaries
-				            var ii: int = i + (m - kCenterY)
-				            var jj: int = j + (n - kCenterX)
-				            if ii>=0 and ii<Me and jj>=0 and jj<Ne then
-				              C[baseOut + e] = C[baseOut + e] + A[ii * Ne + jj] * B[baseKer + m * L + n]
-				            end
-			        	end
-			      	end
-		    	end
-		    	e = e+1
-			end
-		end
-	end
-end
+-- function blockedloop(M,N,blocksizes,bodyfn)
+--   local function generatelevel(n,ii,jj,bb0,bb1)
+--     if n > #blocksizes then
+--       return bodyfn(ii,jj)
+--     end
+--     local blocksize = blocksizes[n]
+--     return quote for i = ii,min(ii+bb0,M),blocksize do
+--                    for j = jj,min(jj+bb1,N),blocksize do
+--                         [ generatelevel(n+1,i,j,blocksize,blocksize) ]
+--            		end end end
+--   end
+--   return generatelevel(1,0,0,M,N)
+-- end
 
 function gennaiveconv()
 
@@ -218,87 +80,218 @@ function gennaiveconv()
 	end
 end
 
-function genconvolution(NB,NBF,RM,RN,V,K,L,NF)
-	-- register blocking does not need to be a a multiple of the blocksize anymore
-	if not isinteger(NB/RN) or not isinteger(NB/RM) then
-		print("3rd level blocksizes must be a multiple of the 2nd")
-		return false
+function genlowimage()
+   
+	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, A : &number, AA : &number) 
+		var kAenterX : int = K/2
+		var kAenterY : int = L/2
+		var e = 0
+		for i=kAenterX, M-kAenterX do
+		    for j=kAenterY, N-kAenterY do
+	        	for m=0, K do
+	          		for n=0, L do
+			            var ii: int = i + (m - kAenterY)
+			            var jj: int = j + (n - kAenterX)
+			            if ii >= 0 and ii < M and jj >= 0 and jj < N then
+			            	AA[e] = A[ii * N + jj]
+			            else
+			            	AA[e] = 0
+			            end
+			            e = e + 1
+		        	end
+		      	end
+		    end
+		end
 	end
+end
 
-	--5 times NB minimum by dgemm
-	--local NB2 = NBF * NB
-	local NB2 = NB * NBF
-	local l1conv0 = genkernel(NB, RM, RN, 1, false, K, L, NF, false)
-	local l1conv0b = genkernel(NB, 1, 1, 1, false, K, L, NF, true)
+-- Different types according to Caffe con Troll can be implemented
+function genlowkernel(loweringtype)
 
-	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, 
-		alpha : number, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number, 
-		sdc : int, ldc : int, kCenterX: int, kCenterY: int)
-
-		M = M-kCenterX
-		N = N-kCenterY
-
-		for mm = kCenterX,M,NB2 do
-			for nn = kCenterY,N,NB2 do
-				for m = mm,min(mm+NB2,M),NB do
-					for n = nn,min(nn+NB2,N),NB do
-					 	var MM,NN = min(M-m,NB),min(N-n,NB)
-	                    var isboundary = MM < NB or NN < NB
-	                    var AA,CC = A + ((m-kCenterX)*lda + (n-kCenterY)),C + ((m-kCenterX)*ldc + (n-kCenterY))
-	                    if isboundary then -- do not enter here YET
-	                    	l1conv0b(AA,
-	                         B,
-	                         CC,
-	                         sda,lda,ldb,sdc,ldc,0,MM,NN)
-	                    else
-	                        l1conv0(AA,
-	                         B,
-	                         CC,
-	                         sda,lda,ldb,sdc,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
-	                    end
-					end
+	return terra(gettime : {} -> number, Bs : &number, K : int, L : int, BBs : &number, Klow : int, Llow : int)
+		if loweringtype == 1 then
+			var base = Klow
+			var count = 0
+			for d=0,Llow do
+				for i=0,Klow do
+					BBs[i*Llow + d] = Bs[base*d + i]
 				end
 			end
 		end
+	end
 
-         -- [ blockedloop(M,N,{NB2,NB},
-         --        function(m,n) 
-         --        return quote
-         --            var MM,NN = min(M-m,NB),min(N-n,NB)
-         --            var isboundary = MM < NB or NN < NB
-         --            var AA,CC = A + (m*lda + n),C + (m*ldc + n)
-         --            if isboundary then -- do not enter here YET
-         --             l1conv0b(AA,
-         --                 B,
-         --                 CC,
-         --                 sda,lda,ldb,ldc,0,MM,NN)
-         --            else
-         --                l1conv0(AA,
-         --                 B,
-         --                 CC,
-         --                 sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
-         --            end
-         --        end end)  
-         --    ]       
+end
+
+function liftresult(loweringtype) 
+	
+	return terra(gettime : {} -> number, C : &number, M : int, N : int, Clow : &number, Mlow : int, Llow : int)
+		if loweringtype == 1 then
+			var count = 0
+			for i=0,Llow do
+				for j=0,Mlow do
+					-- iterate over all the columns first
+					C[count] = Clow[j*Llow + i]
+					count = count + 1
+				end
+			end
+		end
 	end
 end
+
+terra printlifted(A : &number, M : int, N : int, depth : int)
+	var dim = M*N
+	for d=0,depth do
+		var base = M*N
+		for i=0,M do 
+			for j=0,N do
+				cstdio.printf("%1.f ", A[base + i*N + j])
+			end
+			cstdio.printf("\n")
+		end
+		cstdio.printf("\n")
+	end
+end
+
+terra printM(A : &number, M : int, N : int)
+	for i=0,M do 
+		for j=0,N do
+			cstdio.printf("%1.f ", A[i*N + j])
+		end
+		cstdio.printf("\n")
+	end
+	cstdio.printf("\n")
+end
+
+function genconvolution(NB,NBF,RM,RN,V,K,L)
+	-- Lowering type according to CcT (http://arxiv.org/abs/1504.04343)
+	local ltype = 1
+
+	-- Lower the image is the 2D direct method without the multiplication
+	-- These are not kernels, they are full operations
+
+
+	local my_dgemm = generatedgemm(64,5,RM,RN,V)
+	
+	-- local loweredImg = genLowImage(NB, NBF, RM, RN, V, K, L)
+	local loweredImg = genlowimage()
+	local loweredKer = genlowkernel(ltype)
+	local liftedResult = liftresult(ltype)
+
+	return terra(gettime : {} -> number, 
+		A : &number,
+		M : int, N : int, K : int, L: int, 
+		alpha : number, 
+		B : &number, ldb : int, 
+		C : &number, sdc : int, ldc : int, 
+		kCenterX: int, kCenterY: int, 
+		depth : int,
+		AA : &number, BB : &number, CC : &number)
+
+		-- MlowxNlow * KlowxLlow, where Nlow == Llow ---> Mlow x Llow 
+		var Mlow, Nlow, Klow, Llow = sdc*ldc, K*L, K*L, depth
+
+		-- (1) lower
+		loweredKer(nil,B,K,L,BB,Klow,Llow)
+		-- printM(AA,Mlow,Nlow)
+		
+		loweredImg(nil,M,N,K,L,A,AA)
+		printM(BB,Klow,Llow)
+		
+		-- (2) gemm
+		my_dgemm(nil,Mlow,Llow,Klow,1.0,AA,Nlow,BB,Llow,0.0,CC,Llow)
+
+		printM(CC,Mlow,Llow)
+		
+		-- (3) lifting
+		liftedResult(nil,C,M,N,CC,Mlow,Llow)
+		-- printlifted(C,sdc,ldc,depth)
+	end
+end
+
+
+-- function genLowImageOPT(NB,NBF,RM,RN,V,K,L)
+-- 	-- register blocking does not need to be a a multiple of the blocksize anymore
+-- 	if not isinteger(NB/RN) or not isinteger(NB/RM) then
+-- 		print("3rd level blocksizes must be a multiple of the 2nd")
+-- 		return false
+-- 	end
+
+-- 	--5 times NB minimum by dgemm
+-- 	--local NB2 = NBF * NB
+-- 	local NB2 = NB * NBF
+-- 	local l1conv0 = genkernel(NB, RM, RN, true, K, L, false)
+-- 	local l1conv0b = genkernel(NB, 1, 1, true, K, L, true)
+
+-- 	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, 
+-- 		alpha : number, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number, 
+-- 		sdc : int, ldc : int, kCenterX: int, kCenterY: int, depth : int, batches : int)
+
+
+-- 		M = M-kCenterX
+-- 		N = N-kCenterY
+
+-- 		for mm = kCenterX,M,NB2 do
+-- 			for nn = kCenterY,N,NB2 do
+-- 				for m = mm,min(mm+NB2,M),NB do
+-- 					for n = nn,min(nn+NB2,N),NB do
+-- 					 	var MM,NN = min(M-m,NB),min(N-n,NB)
+-- 	                    var isboundary = MM < NB or NN < NB
+-- 	                    var AA,CC = A + ((m-kCenterX)*lda + (n-kCenterY)),C + ((m-kCenterX)*ldc + (n-kCenterY))
+-- 	                    if isboundary then -- do not enter here YET
+-- 	                    	l1conv0b(AA,
+-- 	                         B,
+-- 	                         CC,
+-- 	                         sda,lda,ldb,sdc,ldc,0,MM,NN)
+-- 	                    else
+-- 	                        l1conv0(AA,
+-- 	                         B,
+-- 	                         CC,
+-- 	                         sda,lda,ldb,sdc,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+-- 	                    end
+-- 					end
+-- 				end
+-- 			end
+-- 		end
+
+--          -- [ blockedloop(M,N,{NB2,NB},
+--          --        function(m,n) 
+--          --        return quote
+--          --            var MM,NN = min(M-m,NB),min(N-n,NB)
+--          --            var isboundary = MM < NB or NN < NB
+--          --            var AA,CC = A + (m*lda + n),C + (m*ldc + n)
+--          --            if isboundary then -- do not enter here YET
+--          --             l1conv0b(AA,
+--          --                 B,
+--          --                 CC,
+--          --                 sda,lda,ldb,ldc,0,MM,NN)
+--          --            else
+--          --                l1conv0(AA,
+--          --                 B,
+--          --                 CC,
+--          --                 sda,lda,ldb,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+--          --            end
+--          --        end end)  
+--          --    ]       
+-- 	end
+-- end
 
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {64}
+local blocksizes = {8}
 local regblocks = {1}--,2,4,8}
 
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
-local filters = {5,7,11,13}--,5}
-local nfilter = {10,100,200,1024}--,2,3}
+local filters = {3}--,5}
+local nfilter = {2}--10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
 
 if dotune then
-	local tunefor = 64 -- full size of the matrix
+	-- full size of the matrix
+	local tunefor = 8 
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 		for _,b in ipairs(blocksizes) do
@@ -308,9 +301,8 @@ if dotune then
 						for _,f in ipairs(nfilter) do
 							for _,k in ipairs(filters) do
 								-- same until here
-								-- local my_conv = genconvolution(b,NB2,rm,rn,v,k,k,f)
+								local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
 								-- local my_conv = gennaiveconv()
-								local my_conv = maxreuse()
 								if my_conv then
 									print(b,rm,rn,v,k,f)
 									my_conv:compile()
@@ -318,9 +310,11 @@ if dotune then
 									local i = math.floor(tunefor / b) * b
 									local curr_gflops = 0
 									local ctyp
-									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(Me,Ne,K,L,M,N,A,B,C,f)
-										-- to gennaive pass the #kernels here
-				                    	my_conv(nil,Me,Ne,K,L,1.0,A,Me,Ne,B,L,C,M,N,K/2,L/2,f) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
+										function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
+											-- to gennaive pass the #kernels here
+				                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
+				                    		-- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 									end)
 									if not correct then	print("<error>") break end
 									print(i,unpack (exectimes),"[OK]")
