@@ -12,8 +12,8 @@
         *Make sure terra is in your $PATH or you have an alias to it
 
     most important branches: 
-        -> master: by Direct method (multi-threaded and using vector instr)
-        -> wip/optlowering: by Lowering (multi-threaded, using optimized GEMM)
+        -> dev/direct-mt: by Direct method (multi-threaded and using vector instr)
+        -> dev/lowering: by Lowering (multi-threaded, using optimized GEMM)
         -> wip/fastconvolution: by FFT method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
         wip/mthreading: Direct method only multi-threading
