@@ -18,6 +18,18 @@ end
 
 local MTH = {}
 
+function assertmm(CR,C,A,B,M,N,K)
+	for m=0, M - 1 do
+		for n=0, N - 1 do
+			CR[m*N + n] = 0
+			for k=0, K - 1 do
+				CR[m*N + n] = CR[m*N + n] + A[m*K + k] * B[k*N + n] 
+			end
+			-- if CR[m*N + n] ~= C[m*N + n] then return false end
+		end
+	end
+    return true
+end
 
 -- find a standard convolution and make it here
 -- 	void cblas_dgemm(int, int,
@@ -43,6 +55,7 @@ function asserteq(C,CR,rows,cols,depth)
     end
     return true
 end
+
 
 function printMatrix(m,rows,columns,depth)
     local dim = rows * columns
@@ -216,6 +229,64 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		end
 	end
 	return checked,results
+end
+
+function MTH.timefunctionsGEMM(typstring,M,K,N,...)
+    local ctyp = typstring.."[?] __attribute__((aligned(64)))"
+    local A,B = ffi.new(ctyp,M*K), ffi.new(ctyp,K*N)
+
+    print("M:" .. M .. " K:" .. K .. " N:" .. N)
+
+    for m = 0, M-1 do
+        for k = 0, K-1 do
+            A[m*K + k] = math.random(0,9)
+        end
+    end
+    for k = 0, K-1 do
+        for n = 0, N-1 do
+            B[k*N + n] = math.random(0,9)
+        end
+    end
+    local fns = {...}
+    local Cs = {}
+    for i,fn in ipairs(fns) do
+        local C = ffi.new(ctyp,M*N)
+        for j = 0, M * N - 1 do
+            C[j] = -1
+        end 
+        Cs[i] = C
+    end
+
+    local results = {}
+    local check = false
+    for i,fn in ipairs(fns) do
+        local C = Cs[i]
+        local tocall = function() fn(M,K,N,A,B,C) end
+        tocall()
+        results[i] = M*N*K*2.0*1e-9 / CalcTime(tocall)
+        
+        local CR = ffi.new(ctyp,M*N)
+        check = assertmm(CR,C,A,B,M,N,K)
+        printMatrix(A,M,K,0)
+        printMatrix(B,K,N,0)
+        printMatrix(C,M,N,0)
+        printMatrix(CR,M,N,0)
+        
+        if i ~= 1 then
+            local C0 = Cs[1]
+            local C1 = Cs[i]
+            local c = 0
+            for m = 0, M-1 do
+                for n = 0, N-1 do
+                    if C0[c]~= C1[c] then
+                        return false
+                    end
+                    c = c + 1
+                end
+            end
+        end
+    end
+    return check,results
 end
 
 return MTH

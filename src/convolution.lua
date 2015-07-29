@@ -31,6 +31,10 @@ function printMatrix(m,rows,columns)
   io.write("\n")
 end
 
+terra max(a : int, b : int)
+	return terralib.select(a > b, a, b)
+end
+
 -- terra min(a : int, b : int)
 -- 	return terralib.select(a < b, a, b)
 -- end
@@ -48,6 +52,19 @@ end
 --   end
 --   return generatelevel(1,0,0,M,N)
 -- end
+function gennaivegemm()
+
+	return terra(gettime : {} -> number, CC : &number, AA : &number, BB : &number, M : int, N : int, K : int, ix : int, iy : int)
+		for m=ix, M do
+			for n=iy, N do
+				CC[m*N + n] = 0
+				for k=0, K do
+					CC[m*N + n] = CC[m*N + n] + AA[m*K + k] * BB[k*N + n]
+				end
+			end
+		end
+	end
+end
 
 function gennaiveconv()
 
@@ -80,31 +97,32 @@ function gennaiveconv()
 	end
 end
 
-function genlowimage()
+function genlowimage(loweringtype)
    
 	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, A : &number, AA : &number) 
-		var kAenterX : int = K/2
-		var kAenterY : int = L/2
-		var e = 0
-		for i=kAenterX, M-kAenterX do
-		    for j=kAenterY, N-kAenterY do
-	        	for m=0, K do
-	          		for n=0, L do
-			            var ii: int = i + (m - kAenterY)
-			            var jj: int = j + (n - kAenterX)
-			            if ii >= 0 and ii < M and jj >= 0 and jj < N then
-			            	AA[e] = A[ii * N + jj]
-			            else
-			            	AA[e] = 0
-			            end
-			            e = e + 1
-		        	end
-		      	end
-		    end
+		if loweringtype == 1 then
+			var kAenterX : int = K/2
+			var kAenterY : int = L/2
+			var e = 0
+			for i=kAenterX, M-kAenterX do
+			    for j=kAenterY, N-kAenterY do
+		        	for m=0, K do
+		          		for n=0, L do
+				            var ii: int = i + (m - kAenterY)
+				            var jj: int = j + (n - kAenterX)
+				            if ii >= 0 and ii < M and jj >= 0 and jj < N then
+				            	AA[e] = A[ii * N + jj]
+				            else
+				            	AA[e] = 0
+				            end
+				            e = e + 1
+			        	end
+			      	end
+			    end
+			end
 		end
 	end
 end
-
 -- Different types according to Caffe con Troll can be implemented
 function genlowkernel(loweringtype)
 
@@ -165,19 +183,19 @@ end
 function genconvolution(NB,NBF,RM,RN,V,K,L)
 	-- Lowering type according to CcT (http://arxiv.org/abs/1504.04343)
 	local ltype = 1
-
-	-- Lower the image is the 2D direct method without the multiplication
-	-- These are not kernels, they are full operations
-
-
-	local my_dgemm = generatedgemm(64,5,RM,RN,V)
 	
-	-- local loweredImg = genLowImage(NB, NBF, RM, RN, V, K, L)
-	local loweredImg = genlowimage()
-	local loweredKer = genlowkernel(ltype)
-	local liftedResult = liftresult(ltype)
+	-- Lower the image is the 2D direct method without the multiplication
+	-- These are not kernels, they are FULL OPERATIONS
+	
+	-- naive gemm for borders	
+	-- local my_loweredimg = genLowImage(NB, NBF, RM, RN, V, K, L)
+	local my_gemmopt = generatedgemm(NB,5,RM,RN,V)
+	local my_naivegemm = gennaivegemm()
+	local my_loweredimg = genlowimage(ltype)
+	local my_loweredker = genlowkernel(ltype)
+	local my_liftedresult = liftresult(ltype)
 
-	return terra(gettime : {} -> number, 
+	return terra(gettime : {} -> double, 
 		A : &number,
 		M : int, N : int, K : int, L: int, 
 		alpha : number, 
@@ -191,20 +209,33 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 		var Mlow, Nlow, Klow, Llow = sdc*ldc, K*L, K*L, depth
 
 		-- (1) lower
-		loweredKer(nil,B,K,L,BB,Klow,Llow)
-		-- printM(AA,Mlow,Nlow)
-		
-		loweredImg(nil,M,N,K,L,A,AA)
+		my_loweredimg(nil,M,N,K,L,A,AA)
+		printM(AA,Mlow,Klow)
+		my_loweredker(nil,B,K,L,BB,Klow,Llow)
 		printM(BB,Klow,Llow)
 		
 		-- (2) gemm
-		my_dgemm(nil,Mlow,Llow,Klow,1.0,AA,Nlow,BB,Llow,0.0,CC,Llow)
+		if not Mlow >= Llow then  
+			cstdio.printf("#batches must be greater than #kernels\n")
+			return false 
+		end
+		
+		-- var i : int = Mlow/Llow - 1
+		-- var rest = Mlow % Llow
+		-- repeat
+			-- my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA,Klow,BB,Llow,CC + i*Llow*Llow ,Llow)
+			-- i = i - 1
+		-- until i  0
+		-- var rest = 5
+		-- if rest > 0 then
+		my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
+		-- end
 
 		printM(CC,Mlow,Llow)
 		
 		-- (3) lifting
-		liftedResult(nil,C,M,N,CC,Mlow,Llow)
-		-- printlifted(C,sdc,ldc,depth)
+		my_liftedresult(nil,C,M,N,CC,Mlow,Llow)
+		printlifted(C,sdc,ldc,depth)
 	end
 end
 
@@ -294,36 +325,39 @@ if dotune then
 	local tunefor = 8 
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-		for _,b in ipairs(blocksizes) do
-			for _,rm in ipairs(regblocks) do
-				for _,rn in ipairs(regblocks) do
-					for _,v in ipairs(vectors) do
-						for _,f in ipairs(nfilter) do
-							for _,k in ipairs(filters) do
-								-- same until here
-								local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
-								-- local my_conv = gennaiveconv()
-								if my_conv then
-									print(b,rm,rn,v,k,f)
-									my_conv:compile()
-									-- bellow line makes do not need boundary cases (image multiple of blocksize)
-									local i = math.floor(tunefor / b) * b
-									local curr_gflops = 0
-									local ctyp
-									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
-										function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
-											-- to gennaive pass the #kernels here
-				                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
-				                    		-- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-									end)
-									if not correct then	print("<error>") break end
-									print(i,unpack (exectimes),"[OK]")
-									local curr_gflops = exectimes[1]
-									-- print(curr_gflops) -- print analysis 
-									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-										best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
-										terralib.tree.printraw(best)
-									end
+	for _,b in ipairs(blocksizes) do
+		for _,rm in ipairs(regblocks) do
+			for _,rn in ipairs(regblocks) do
+				for _,v in ipairs(vectors) do
+					for _,f in ipairs(nfilter) do
+						for _,k in ipairs(filters) do
+							-- local my_conv = gennaiveconv()
+							local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
+							-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
+							if my_conv then
+								print(b,rm,rn,v,k,f)
+								my_conv:compile()
+								-- bellow line makes do not need boundary cases (image multiple of blocksize)
+								local i = math.floor(tunefor / b) * b
+								local curr_gflops = 0
+								local ctyp
+								local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
+									function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
+										-- to gennaive pass the #kernels here
+			                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
+			                    		-- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+								end)
+								-- test only GEMM
+								-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
+								-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
+								-- end)
+								if not correct then	print("<error>") break end
+								print(i,unpack (exectimes),"[OK]")
+								local curr_gflops = exectimes[1]
+								-- print(curr_gflops) -- print analysis 
+								if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+									best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
+									terralib.tree.printraw(best)
 								end
 							end
 						end
@@ -331,7 +365,21 @@ if dotune then
 				end
 			end
 		end
+	end
 end
-local my_convolution = gennaiveconv()
--- local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
-terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
+
+-- local my_convolution = gennaiveconv()
+
+local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
+if number == double then
+	terralib.saveobj("my_dconv.o", {my_convolution = my_convolution})
+else
+	terralib.saveobj("my_sconv.o", {my_convolution = my_convolution})
+end
+
+-- local my_dgemm = generatedgemm(best.b, 5, best.rm, best.rn, best.v)
+-- if number == double then
+-- 	terralib.saveobj("my_dgemm.o", { my_dgemm = my_dgemm })
+-- else
+-- 	terralib.saveobj("my_sgemm.o", { my_sgemm = my_dgemm })
+-- end

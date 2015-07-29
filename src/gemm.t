@@ -136,7 +136,7 @@ function generatedgemm(NB,NBF,RM,RN,V)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
-		           beta : number, C : &number, ldc : int)
+		            C : &number, ldc : int)
 		[ blockedloop(N,M,K,{NB2,NB},
 								function(m,n,k) return quote
 								var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
@@ -191,10 +191,7 @@ if dotune then
 						local avg = 0
 						local ctyp
 						local s, times = harness.timefunctions(tostring(number),i,i,i,function(M,K,N,A,B,C)
-							--lower
-							my_dgemm(nil,M,N,K,1.0,A,K,B,N,0.0,C,N)
-							my_dgemm(nil,Mlow,Nlow,Klow,1.0,AA,Nlow,BB,Llow,0.0,CC,Llow)
-							--lifting
+							my_dgemm(nil,M,N,K,1.0,A,K,B,N,C,N)
 						end)
 						if not s then
 							print("<error>")
