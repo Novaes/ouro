@@ -205,14 +205,16 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		-- Check correctness to any of the function tested
 		-- In this case I'm testing only the convolution
 
-		-- print("Naive")
-		-- printMatrix(CR,M,N,depth)
+		
+		
 
 		-- CHECK CORRECTNESS
 		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		checked = asserteq(Cs,CR,M,N,depth)
 		if checked == false then break end
-		
+		-- print("Naive")
+		-- printMatrix(CR,M,N,depth)
+
 		-- Print in case detailed analysis
 		if i ~= 1 then
 			local C0 = Cs[1]

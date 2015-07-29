@@ -112,7 +112,7 @@ function genlowimage(loweringtype)
 				            var jj: int = j + (n - kAenterX)
 				            if ii >= 0 and ii < M and jj >= 0 and jj < N then
 				            	AA[e] = A[ii * N + jj]
-				            else
+				            else 
 				            	AA[e] = 0
 				            end
 				            e = e + 1
@@ -156,21 +156,35 @@ function liftresult(loweringtype)
 	end
 end
 
-terra printlifted(A : &number, M : int, N : int, depth : int)
-	var dim = M*N
-	for d=0,depth do
-		var base = M*N
-		for i=0,M do 
-			for j=0,N do
-				cstdio.printf("%1.f ", A[base + i*N + j])
-			end
-			cstdio.printf("\n")
-		end
-		cstdio.printf("\n")
-	end
+terra printMatrix(m : &number,rows : int,columns : int,depth : int)
+    var dim = rows * columns
+    if depth > 1 then 
+
+    	-- print each output
+        for d=0,depth-1 do
+            var base = dim * d
+            for i=0,rows-1 do
+                for j=0,columns-1 do
+                    io.write(" " .. m[base + i*columns + j])
+                end
+                io.write("\n")
+            end
+            io.write("\n")
+        end
+
+    else
+        -- usual matrix print
+        for i=0,rows-1 do
+            for j=0,columns-1 do
+              io.write(" " .. m[i*columns + j])
+            end
+            io.write("\n")
+        end
+    end
+    io.write("\n")
 end
 
-terra printM(A : &number, M : int, N : int)
+terra print2D(A : &number, M : int, N : int)
 	for i=0,M do 
 		for j=0,N do
 			cstdio.printf("%1.f ", A[i*N + j])
@@ -210,9 +224,9 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 
 		-- (1) lower
 		my_loweredimg(nil,M,N,K,L,A,AA)
-		printM(AA,Mlow,Klow)
+		print2D(AA,Mlow,Klow)
 		my_loweredker(nil,B,K,L,BB,Klow,Llow)
-		printM(BB,Klow,Llow)
+		print2D(BB,Klow,Llow)
 		
 		-- (2) gemm
 		if not Mlow >= Llow then  
@@ -220,22 +234,25 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 			return false 
 		end
 		
-		-- var i : int = Mlow/Llow - 1
+		-- var i : int = Mlow/NB - 1
 		-- var rest = Mlow % Llow
+		-- cstdio.printf("REST: %d\n",rest)
 		-- repeat
-			-- my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA,Klow,BB,Llow,CC + i*Llow*Llow ,Llow)
+		-- cstdio.printf("Parameters %d %d %d\n",Mlow, Nlow, Klow)
+			my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA,Klow,BB,Llow,CC,Llow)
 			-- i = i - 1
-		-- until i  0
-		-- var rest = 5
+		-- until i < 0
+		-- cstdio.printf("REST: %d\n",rest)
 		-- if rest > 0 then
-		my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
+			-- my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
 		-- end
 
-		printM(CC,Mlow,Llow)
+		-- print2D(CC,Mlow,Llow)
 		
 		-- (3) lifting
 		my_liftedresult(nil,C,M,N,CC,Mlow,Llow)
-		printlifted(C,sdc,ldc,depth)
+		print2D(CC,Mlow,Llow)
+		-- printMatrix(C,sdc,ldc,depth)
 	end
 end
 
@@ -309,20 +326,20 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {8}
+local blocksizes = {4}
 local regblocks = {1}--,2,4,8}
 
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
 local filters = {3}--,5}
-local nfilter = {2}--10,100,200,1024}--,2,3}
+local nfilter = {6}--10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 8 
+	local tunefor = 4
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do
@@ -337,6 +354,7 @@ if dotune then
 							if my_conv then
 								print(b,rm,rn,v,k,f)
 								my_conv:compile()
+								
 								-- bellow line makes do not need boundary cases (image multiple of blocksize)
 								local i = math.floor(tunefor / b) * b
 								local curr_gflops = 0
