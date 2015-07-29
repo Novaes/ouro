@@ -135,8 +135,48 @@ function generatedgemm(NB,NBF,RM,RN,V)
 	local l1dgemm0b = genkernel(NB,1,1,1,0,true)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
 
+
+
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		            C : &number, ldc : int)
+		
+	for mm = 0,M,NB2 do
+		for nn = 0,N,NB2 do
+			for kk = 0,K, NB2 do
+				for m = mm,min(mm+NB2,M),NB do
+					for n = nn,min(nn+NB2,N),NB do
+						for k = kk,min(kk+NB2,K),NB do
+							var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
+							var isboundary = MM < NB or NN < NB or KK < NB
+							var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
+							if k == 0 then
+								if isboundary then
+									--IO.printf("b0 %d %d %d\n",MM,NN,KK)
+									l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
+
+									--IO.printf("be %d %d %d\n",MM,NN,KK)
+								else
+									l1dgemm0(AA,BB,CC,lda,ldb,ldc)
+								end
+							else
+								if isboundary then
+
+									--IO.printf("b %d %d %d\n",MM,NN,KK)
+									l1dgemm1b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
+
+									--IO.printf("be %d %d %d\n",MM,NN,KK)
+								else
+									l1dgemm1(AA,BB,CC,lda,ldb,ldc)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	--[[
 		[ blockedloop(N,M,K,{NB2,NB},
 								function(m,n,k) return quote
 								var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
@@ -163,6 +203,7 @@ function generatedgemm(NB,NBF,RM,RN,V)
 									end
 								end
 		end end) ]
+								]]
 	end
 end
 

@@ -224,34 +224,43 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 
 		-- (1) lower
 		my_loweredimg(nil,M,N,K,L,A,AA)
-		print2D(AA,Mlow,Klow)
+		-- print2D(AA,Mlow,Klow)
 		my_loweredker(nil,B,K,L,BB,Klow,Llow)
-		print2D(BB,Klow,Llow)
+		-- print2D(BB,Klow,Llow)
 		
 		-- (2) gemm
-		if not Mlow >= Llow then  
-			cstdio.printf("#batches must be greater than #kernels\n")
-			return false 
-		end
+		-- if not Mlow >= Llow then  
+		-- 	cstdio.printf("#batches must be greater than #kernels\n")
+		-- 	return false 
+		-- end
 		
+		-- var step : int
+		-- if Llow > NB then
+		-- 	step = Llow
+		-- else
+		-- 	step = NB
+		-- end
+
 		-- var i : int = Mlow/NB - 1
-		-- var rest = Mlow % Llow
-		-- cstdio.printf("REST: %d\n",rest)
+		
 		-- repeat
-		-- cstdio.printf("Parameters %d %d %d\n",Mlow, Nlow, Klow)
-			my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA,Klow,BB,Llow,CC,Llow)
+			-- cstdio.printf("Parameters %d %d %d\n",Mlow, Nlow, Klow)
+		my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
 			-- i = i - 1
 		-- until i < 0
+
+		-- see if this case exists
+		-- var rest = Mlow % NB
 		-- cstdio.printf("REST: %d\n",rest)
 		-- if rest > 0 then
-			-- my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
+		-- 	my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
 		-- end
 
 		-- print2D(CC,Mlow,Llow)
 		
 		-- (3) lifting
 		my_liftedresult(nil,C,M,N,CC,Mlow,Llow)
-		print2D(CC,Mlow,Llow)
+		-- print2D(CC,Mlow,Llow)
 		-- printMatrix(C,sdc,ldc,depth)
 	end
 end
@@ -278,28 +287,28 @@ end
 -- 		M = M-kCenterX
 -- 		N = N-kCenterY
 
--- 		for mm = kCenterX,M,NB2 do
--- 			for nn = kCenterY,N,NB2 do
--- 				for m = mm,min(mm+NB2,M),NB do
--- 					for n = nn,min(nn+NB2,N),NB do
--- 					 	var MM,NN = min(M-m,NB),min(N-n,NB)
--- 	                    var isboundary = MM < NB or NN < NB
--- 	                    var AA,CC = A + ((m-kCenterX)*lda + (n-kCenterY)),C + ((m-kCenterX)*ldc + (n-kCenterY))
--- 	                    if isboundary then -- do not enter here YET
--- 	                    	l1conv0b(AA,
--- 	                         B,
--- 	                         CC,
--- 	                         sda,lda,ldb,sdc,ldc,0,MM,NN)
--- 	                    else
--- 	                        l1conv0(AA,
--- 	                         B,
--- 	                         CC,
--- 	                         sda,lda,ldb,sdc,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
--- 	                    end
--- 					end
--- 				end
--- 			end
--- 		end
+		-- for mm = kCenterX,M,NB2 do
+		-- 	for nn = kCenterY,N,NB2 do
+		-- 		for m = mm,min(mm+NB2,M),NB do
+		-- 			for n = nn,min(nn+NB2,N),NB do
+		-- 			 	var MM,NN = min(M-m,NB),min(N-n,NB)
+	 --                    var isboundary = MM < NB or NN < NB
+	 --                    var AA,CC = A + ((m-kCenterX)*lda + (n-kCenterY)),C + ((m-kCenterX)*ldc + (n-kCenterY))
+	 --                    if isboundary then -- do not enter here YET
+	 --                    	l1conv0b(AA,
+	 --                         B,
+	 --                         CC,
+	 --                         sda,lda,ldb,sdc,ldc,0,MM,NN)
+	 --                    else
+	 --                        l1conv0(AA,
+	 --                         B,
+	 --                         CC,
+	 --                         sda,lda,ldb,sdc,ldc,0) -- -- todo: analyze prefetch argument, past => terralib.select(k == 0,0,1) 
+	 --                    end
+		-- 			end
+		-- 		end
+		-- 	end
+		-- end
 
 --          -- [ blockedloop(M,N,{NB2,NB},
 --          --        function(m,n) 
@@ -326,20 +335,20 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {4}
-local regblocks = {1}--,2,4,8}
+local blocksizes = {8,16,20}
+local regblocks = {1,2,4,8}
 
 -- local vectors = {1,2,4,8,16}
 local vectors = {1}
-local filters = {3}--,5}
-local nfilter = {6}--10,100,200,1024}--,2,3}
+local filters = {5,7,11}
+local nfilter = {4,10,20,30,40,50,100}--10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 4
+	local tunefor = 8
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,b in ipairs(blocksizes) do

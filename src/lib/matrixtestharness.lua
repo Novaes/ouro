@@ -211,7 +211,7 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		-- CHECK CORRECTNESS
 		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		checked = asserteq(Cs,CR,M,N,depth)
-		if checked == false then break end
+		-- if checked == false then break end
 		-- print("Naive")
 		-- printMatrix(CR,M,N,depth)
 
@@ -269,10 +269,10 @@ function MTH.timefunctionsGEMM(typstring,M,K,N,...)
         
         local CR = ffi.new(ctyp,M*N)
         check = assertmm(CR,C,A,B,M,N,K)
-        printMatrix(A,M,K,0)
-        printMatrix(B,K,N,0)
-        printMatrix(C,M,N,0)
-        printMatrix(CR,M,N,0)
+        -- printMatrix(A,M,K,0)
+        -- printMatrix(B,K,N,0)
+        -- printMatrix(C,M,N,0)
+        -- printMatrix(CR,M,N,0)
         
         if i ~= 1 then
             local C0 = Cs[1]
