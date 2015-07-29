@@ -125,10 +125,10 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
 end
 
 function generatedgemm(NB,NBF,RM,RN,V)
-	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
+--[[	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
 	end
-
+]]
 	local NB2 = NBF * NB
 	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false)
 	local l1dgemm1 = genkernel(NB,RM,RN,V,1,false)
@@ -137,7 +137,7 @@ function generatedgemm(NB,NBF,RM,RN,V)
 
 
 
-	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
+	return terra(M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		            C : &number, ldc : int)
 		
 	for mm = 0,M,NB2 do

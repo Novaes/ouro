@@ -8,11 +8,11 @@ function CalcTime(fn)
 	local begin = terralib.currenttimeinseconds()
 	local current
 	local times = 0
-	-- repeat
+	repeat
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	-- until (current - begin) > 0.2
+	until (current - begin) > 0.2
 	return (current - begin - adjust*times) / times 
 end
 
@@ -204,14 +204,10 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		
 		-- Check correctness to any of the function tested
 		-- In this case I'm testing only the convolution
-
-		
-		
-
 		-- CHECK CORRECTNESS
 		naiveConvolve(CR,A,Me,Ne,Bs,K,L,depth)
 		checked = asserteq(Cs,CR,M,N,depth)
-		-- if checked == false then break end
+		if checked == false then break end
 		-- print("Naive")
 		-- printMatrix(CR,M,N,depth)
 

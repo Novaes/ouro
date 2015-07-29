@@ -99,7 +99,7 @@ end
 
 function genlowimage(loweringtype)
    
-	return terra(gettime : {} -> number, M : int, N : int, K : int, L: int, A : &number, AA : &number) 
+	return terra(M : int, N : int, K : int, L: int, A : &number, AA : &number) 
 		if loweringtype == 1 then
 			var kAenterX : int = K/2
 			var kAenterY : int = L/2
@@ -126,7 +126,7 @@ end
 -- Different types according to Caffe con Troll can be implemented
 function genlowkernel(loweringtype)
 
-	return terra(gettime : {} -> number, Bs : &number, K : int, L : int, BBs : &number, Klow : int, Llow : int)
+	return terra( Bs : &number, K : int, L : int, BBs : &number, Klow : int, Llow : int)
 		if loweringtype == 1 then
 			var base = Klow
 			var count = 0
@@ -142,7 +142,7 @@ end
 
 function liftresult(loweringtype) 
 	
-	return terra(gettime : {} -> number, C : &number, M : int, N : int, Clow : &number, Mlow : int, Llow : int)
+	return terra(C : &number, M : int, N : int, Clow : &number, Mlow : int, Llow : int)
 		if loweringtype == 1 then
 			var count = 0
 			for i=0,Llow do
@@ -223,43 +223,17 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 		var Mlow, Nlow, Klow, Llow = sdc*ldc, K*L, K*L, depth
 
 		-- (1) lower
-		my_loweredimg(nil,M,N,K,L,A,AA)
+		my_loweredimg(M,N,K,L,A,AA)
 		-- print2D(AA,Mlow,Klow)
-		my_loweredker(nil,B,K,L,BB,Klow,Llow)
+		my_loweredker(B,K,L,BB,Klow,Llow)
 		-- print2D(BB,Klow,Llow)
 		
 		-- (2) gemm
-		-- if not Mlow >= Llow then  
-		-- 	cstdio.printf("#batches must be greater than #kernels\n")
-		-- 	return false 
-		-- end
-		
-		-- var step : int
-		-- if Llow > NB then
-		-- 	step = Llow
-		-- else
-		-- 	step = NB
-		-- end
-
-		-- var i : int = Mlow/NB - 1
-		
-		-- repeat
-			-- cstdio.printf("Parameters %d %d %d\n",Mlow, Nlow, Klow)
-		my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
-			-- i = i - 1
-		-- until i < 0
-
-		-- see if this case exists
-		-- var rest = Mlow % NB
-		-- cstdio.printf("REST: %d\n",rest)
-		-- if rest > 0 then
-		-- 	my_naivegemm(nil,CC, AA, BB, Mlow, Llow, Klow, 0,0)
-		-- end
-
+		my_gemmopt(Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
 		-- print2D(CC,Mlow,Llow)
 		
 		-- (3) lifting
-		my_liftedresult(nil,C,M,N,CC,Mlow,Llow)
+		my_liftedresult(C,M,N,CC,Mlow,Llow)
 		-- print2D(CC,Mlow,Llow)
 		-- printMatrix(C,sdc,ldc,depth)
 	end
@@ -335,29 +309,27 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {8,16,20}
-local regblocks = {1,2,4,8}
-
--- local vectors = {1,2,4,8,16}
-local vectors = {1}
-local filters = {5,7,11}
-local nfilter = {4,10,20,30,40,50,100}--10,100,200,1024}--,2,3}
+local blocksizes = {80,180,256}
+local regblocks = {1,2,4}
+local vectors = {1,2,4,8,16}
+local filters = {3,5,7,11}
+local nfilter = {4,10,20,30}--10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 8
+	local tunefor = 1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-	for _,b in ipairs(blocksizes) do
-		for _,rm in ipairs(regblocks) do
-			for _,rn in ipairs(regblocks) do
-				for _,v in ipairs(vectors) do
-					for _,f in ipairs(nfilter) do
-						for _,k in ipairs(filters) do
-							-- local my_conv = gennaiveconv()
+	for _,f in ipairs(nfilter) do
+		for _,k in ipairs(filters) do
+			for _,b in ipairs(blocksizes) do
+				for _,rm in ipairs(regblocks) do
+					for _,rn in ipairs(regblocks) do
+						for _,v in ipairs(vectors) do				
+								-- local my_conv = gennaiveconv()
 							local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
 							-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
 							if my_conv then
