@@ -309,11 +309,12 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {16,32,40,48,60}
-local regblocks = {1,2,4}
-local vectors = {1,2,4,8,16}
-local filters = {3,5,7,11}
-local nfilter = {4,10,20,30,40,100} --10,100,200,1024}--,2,3}
+local blocksizes = {48}
+local regblocksM = {1}
+local regblocksN = {4}
+local vectors = {4}
+local filters = {5}
+local nfilter = {1,3,10,40} --10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
@@ -326,8 +327,8 @@ if dotune then
 	for _,f in ipairs(nfilter) do
 		for _,k in ipairs(filters) do
 			for _,b in ipairs(blocksizes) do
-				for _,rm in ipairs(regblocks) do
-					for _,rn in ipairs(regblocks) do
+				for _,rm in ipairs(regblocksM) do
+					for _,rn in ipairs(regblocksN) do
 						for _,v in ipairs(vectors) do				
 								-- local my_conv = gennaiveconv()
 							local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
