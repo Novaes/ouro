@@ -25,7 +25,7 @@ function assertmm(CR,C,A,B,M,N,K)
 			for k=0, K - 1 do
 				CR[m*N + n] = CR[m*N + n] + A[m*K + k] * B[k*N + n] 
 			end
-			-- if CR[m*N + n] ~= C[m*N + n] then return false end
+			if CR[m*N + n] ~= C[m*N + n] then return false end
 		end
 	end
     return true

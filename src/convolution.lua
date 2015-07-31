@@ -309,11 +309,11 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {80,180,256}
+local blocksizes = {16,32,40,48,60}
 local regblocks = {1,2,4}
 local vectors = {1,2,4,8,16}
 local filters = {3,5,7,11}
-local nfilter = {4,10,20,30}--10,100,200,1024}--,2,3}
+local nfilter = {4,10,20,30,40,100} --10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
