@@ -4,7 +4,6 @@ local stdlib = terralib.includec("stdlib.h")
 -- Set number to float in case of Single Float Point tests
 local number = double
 
-
 local function isinteger(x) return math.floor(x) == x end
 local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
 
@@ -309,11 +308,11 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {48}
-local regblocksM = {1}
-local regblocksN = {4}
-local vectors = {4}
-local filters = {5}
+local blocksizes = {16,32,40,48,60}
+local regblocksM = {}--1,2,4,8}
+local regblocksN = {4}--1,2,4,8}
+local vectors = {1,2,4,8,16}
+local filters = {3,5,7,11}
 local nfilter = {1,3,10,40} --10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
