@@ -101,7 +101,7 @@ terra l1MTComputation(args: &opaque) : &opaque
         var MM,NN,KK = min(M-m[i],NB),min(N-n[i],NB),min(K-k[i],NB)
         var isboundary = MM < NB or NN < NB or KK < NB
         var AA,BB,CC = A + (m[i]*lda + k[i]),B + (k[i]*ldb + n[i]),C + (m[i]*ldc + n[i])
-        cstdio.printf("MM %d NN %d KK %d\n",MM,NN,KK)
+        -- cstdio.printf("MM %d NN %d KK %d\n",MM,NN,KK)
         if k[i] == 0 then
             if isboundary then
                 l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)

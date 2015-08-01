@@ -142,13 +142,17 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 	local l1dgemm0b = genkernel(NB,1,1,1,0,true)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
 
-	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
-		            C : &number, ldc : int)
-		   --[[
-		var thwork : int = ldc*ldc/(NB*NB)
-		 cstdio.printf("THWORK: %d",thwork)
-		-- thread adjusts
-		var thr : int = thsize
+	return terra(gettime : {} -> double, M : int64, N : int64, K : int64, alpha : number, A : &number, lda : int64, B : &number, ldb : int64, 
+		            C : &number, ldc : int64)
+		
+		-- If I do M*M/(NB*NB) it gives an overflow
+		var thwork : int64 = M/NB
+		var thr : int64 = thsize
+
+		-- cstdio.printf("NB: %d\n",NB)
+		-- cstdio.printf("M: %d\n",M)
+		-- cstdio.printf("THWORK: %d\n",thwork)
+		
 		-- #threads is greater than the work
 		while (cmath.floor(thwork / thr) == 0) do
 			thr = thr - 1
@@ -158,16 +162,12 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 		var taskspth : int = thwork / thr
 		
 		-- adjust in case of not perfect division
-		 cstdio.printf("ftaskspth: %f\n",ftaskspth)
-		 cstdio.printf("taskspth: %d\n",taskspth)
+		-- cstdio.printf("ftaskspth: %f\n",ftaskspth)
+		-- cstdio.printf("taskspth: %d\n",taskspth)
 		var rr : int = 0
 		if ftaskspth ~= taskspth then
 			rr = thwork % taskspth
 		end
-		]]
-		var thr = thsize
-		var taskspth = 4
-		var rr = 0
 
 		var threads : MT.pthread_t[thsize]
         var pkgs : L1Package[thsize]
@@ -188,12 +188,12 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 					for m = mm,min(mm+NB2,M),NB do
 						for n = nn,min(nn+NB2,N),NB do
 							for k = kk,min(kk+NB2,K),NB do
-								cstdio.printf("adding to thread: %d\n",count)
+								-- cstdio.printf("adding to thread: %d\n",count)
 								if pkgs[count]:addblock(m,n,k) then
 				                	if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
-			                    		cstdio.printf("Thread #%u creation error",threads[count])
+			                    		-- cstdio.printf("Thread #%u creation error",threads[count])
 			                    	end
-			                    		cstdio.printf("---> thread launched: %d\n",count)
+			                    		-- cstdio.printf("---> thread launched: %d\n",count)
 			                    	count = count + 1
 			                    end
 							end
