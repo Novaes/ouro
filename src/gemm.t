@@ -1,6 +1,14 @@
+require "lib/mthreads"
+local stdlib = terralib.includec("stdlib.h")
+local cstdio = terralib.includec("stdio.h")
+local MT = terralib.includec("pthread.h")
+
 local number = double
 local alignment = 8
 local dotune = false
+local thsize = 1
+-- area tunefor/area blocks / thsize
+local taskspth = 2
 
 function symmat(name,I,...)
 	if not I then return symbol(name) end
@@ -102,9 +110,6 @@ function genkernel(NB, RM, RN, V, alpha, boundary)
 	return result
 end
 
-local stdlib = terralib.includec("stdlib.h")
-local IO = terralib.includec("stdio.h")
-
 local terra min(a : int, b : int)
 	return terralib.select(a < b, a, b)
 end
@@ -125,85 +130,63 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
 end
 
 function generatedgemm(NB,NBF,RM,RN,V)
---[[	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
+	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
 	end
-]]
+
 	local NB2 = NBF * NB
 	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false)
 	local l1dgemm1 = genkernel(NB,RM,RN,V,1,false)
 	local l1dgemm0b = genkernel(NB,1,1,1,0,true)
 	local l1dgemm1b = genkernel(NB,1,1,1,1,true)
 
-
-
-	return terra(M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
+	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		            C : &number, ldc : int)
-		
-	for mm = 0,M,NB2 do
-		for nn = 0,N,NB2 do
-			for kk = 0,K, NB2 do
-				for m = mm,min(mm+NB2,M),NB do
-					for n = nn,min(nn+NB2,N),NB do
-						for k = kk,min(kk+NB2,K),NB do
-							var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
-							var isboundary = MM < NB or NN < NB or KK < NB
-							var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
-							if k == 0 then
-								if isboundary then
-									--IO.printf("b0 %d %d %d\n",MM,NN,KK)
-									l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
+	    var threads : MT.pthread_t[thsize]
+	    var count = 0
+ 	    var pkgs : L1Package[thsize]
 
-									--IO.printf("be %d %d %d\n",MM,NN,KK)
-								else
-									l1dgemm0(AA,BB,CC,lda,ldb,ldc)
-								end
-							else
-								if isboundary then
+	    for i=0, thsize do
+	        pkgs[i]:init(NB, M, N, K, A, lda, B, ldb, C, ldc, l1dgemm0b, l1dgemm0, l1dgemm1b, l1dgemm1, taskspth)
+	    end
 
-									--IO.printf("b %d %d %d\n",MM,NN,KK)
-									l1dgemm1b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
-
-									--IO.printf("be %d %d %d\n",MM,NN,KK)
-								else
-									l1dgemm1(AA,BB,CC,lda,ldb,ldc)
-								end
+		for mm = 0,M,NB2 do
+			for nn = 0,N,NB2 do
+				for kk = 0,K, NB2 do
+					for m = mm,min(mm+NB2,M),NB do
+						for n = nn,min(nn+NB2,N),NB do
+							for k = kk,min(kk+NB2,K),NB do
+								cstdio.printf("COUNT: %d\n",count)
+								pkgs[count/taskspth]:addblock(m,n,k)
+				                cstdio.printf("adding to thread: %d\n",count/taskspth)
+				                if (count+1) % taskspth == 0 then
+				                  	cstdio.printf("---> thread launched: %d\n",count/taskspth)
+				                    if MT.pthread_create(&threads[count/taskspth], nil, l1MTComputation , &pkgs[count/taskspth]) ~= 0 then 
+				                    	 cstdio.printf("Thread #%u creation error\n",threads[count/taskspth])
+				                    end
+				                end
+				                count = count + 1
 							end
 						end
 					end
 				end
 			end
 		end
-	end
 
-	--[[
+	    -- cstdio.printf("M %d N %d K %d\n", M,N,K)
+	    --[[
 		[ blockedloop(N,M,K,{NB2,NB},
-								function(m,n,k) return quote
-								var MM,NN,KK = min(M-m,NB),min(N-n,NB),min(K-k,NB)
-								var isboundary = MM < NB or NN < NB or KK < NB
-								var AA,BB,CC = A + (m*lda + k),B + (k*ldb + n),C + (m*ldc + n)
-								if k == 0 then
-									if isboundary then
-										--IO.printf("b0 %d %d %d\n",MM,NN,KK)
-										l1dgemm0b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
-
-										--IO.printf("be %d %d %d\n",MM,NN,KK)
-									else
-										l1dgemm0(AA,BB,CC,lda,ldb,ldc)
-									end
-								else
-									if isboundary then
-
-										--IO.printf("b %d %d %d\n",MM,NN,KK)
-										l1dgemm1b(AA,BB,CC,lda,ldb,ldc,MM,NN,KK)
-
-										--IO.printf("be %d %d %d\n",MM,NN,KK)
-									else
-										l1dgemm1(AA,BB,CC,lda,ldb,ldc)
-									end
-								end
+				function(m,n,k) return quote
+				
 		end end) ]
-								]]
+		]]
+
+	   	for i=0,thsize do
+	        if MT.pthread_join(threads[i],nil) ~= 0 then
+	           cstdio.printf("Thread #%u join error\n",i) 
+	        end
+	    end
+
 	end
 end
 
@@ -232,7 +215,9 @@ if dotune then
 						local avg = 0
 						local ctyp
 						local s, times = harness.timefunctions(tostring(number),i,i,i,function(M,K,N,A,B,C)
+							--lower
 							my_dgemm(nil,M,N,K,1.0,A,K,B,N,C,N)
+							--lifting
 						end)
 						if not s then
 							print("<error>")
