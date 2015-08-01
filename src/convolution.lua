@@ -309,13 +309,13 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
 
-local blocksizes = {8,16,32,40,64}--8,16,32,40,48,60}
+local blocksizes = {8,16,32,64}--8,16,32,40,48,60}
 local regblocksM = {1}--1,2,4,8}
 local regblocksN = {4}--1,2,4,8}
 local vectors = {1}--,2,4,8,16}
 local filters = {3}--,5,7,11}
 local nfilter = {3}--,3,10,40} --10,100,200,1024}--,2,3}
-local nthread = {3}
+local nthread = {4}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
