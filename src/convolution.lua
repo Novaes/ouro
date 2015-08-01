@@ -223,12 +223,12 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 
 		-- (1) lower
 		my_loweredimg(M,N,K,L,A,AA)
-		-- print2D(AA,Mlow,Klow)
+		print2D(AA,Mlow,Klow)
 		my_loweredker(B,K,L,BB,Klow,Llow)
 		-- print2D(BB,Klow,Llow)
 		
 		-- (2) gemm
-		my_gemmopt(Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
+		my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
 		-- print2D(CC,Mlow,Llow)
 		
 		-- (3) lifting
@@ -308,19 +308,19 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-local blocksizes = {16,32,40,48,60}
-local regblocksM = {}--1,2,4,8}
+local blocksizes = {4}--,32,40,48,60}
+local regblocksM = {1}--1,2,4,8}
 local regblocksN = {4}--1,2,4,8}
-local vectors = {1,2,4,8,16}
-local filters = {3,5,7,11}
-local nfilter = {1,3,10,40} --10,100,200,1024}--,2,3}
+local vectors = {1}--,2,4,8,16}
+local filters = {3}--,5,7,11}
+local nfilter = {3}--,3,10,40} --10,100,200,1024}--,2,3}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 1024
+	local tunefor = 8--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,f in ipairs(nfilter) do
@@ -330,7 +330,7 @@ if dotune then
 					for _,rn in ipairs(regblocksN) do
 						for _,v in ipairs(vectors) do				
 								-- local my_conv = gennaiveconv()
-							local my_conv = genconvolution(b,NB2,rm,rn,v,k,k)
+							local my_conv = genconvolution(18,NB2,rm,rn,v,k,k)
 							-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
 							if my_conv then
 								print(b,rm,rn,v,k,f)

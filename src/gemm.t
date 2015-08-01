@@ -8,7 +8,7 @@ local alignment = 8
 local dotune = false
 local thsize = 1
 -- area tunefor/area blocks / thsize
-local taskspth = 2
+local taskspth = 4
 
 function symmat(name,I,...)
 	if not I then return symbol(name) end
@@ -130,10 +130,11 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
 end
 
 function generatedgemm(NB,NBF,RM,RN,V)
+	--[[
 	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
 	end
-
+]]
 	local NB2 = NBF * NB
 	local l1dgemm0 = genkernel(NB,RM,RN,V,0,false)
 	local l1dgemm1 = genkernel(NB,RM,RN,V,1,false)
