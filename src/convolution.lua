@@ -371,14 +371,14 @@ if dotune then
 end
 
 -- local my_convolution = gennaiveconv()
-
+--[[
 local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v,1)
 if number == double then
 	terralib.saveobj("my_dconv.o", {my_convolution = my_convolution})
 else
 	terralib.saveobj("my_sconv.o", {my_convolution = my_convolution})
 end
-
+]]
 -- local my_dgemm = generatedgemm(best.b, 5, best.rm, best.rn, best.v)
 -- if number == double then
 -- 	terralib.saveobj("my_dgemm.o", { my_dgemm = my_dgemm })

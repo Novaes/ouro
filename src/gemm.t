@@ -144,7 +144,7 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		            C : &number, ldc : int)
-		    
+		   --[[
 		var thwork : int = ldc*ldc/(NB*NB)
 		 cstdio.printf("THWORK: %d",thwork)
 		-- thread adjusts
@@ -164,6 +164,10 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 		if ftaskspth ~= taskspth then
 			rr = thwork % taskspth
 		end
+		]]
+		var thr = thsize
+		var taskspth = 4
+		var rr = 0
 
 		var threads : MT.pthread_t[thsize]
         var pkgs : L1Package[thsize]
