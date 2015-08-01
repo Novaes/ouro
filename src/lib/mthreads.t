@@ -64,6 +64,13 @@ terra L1Package:addblock(m : int, n : int, k : int)
     self.n[self.curr] = n
     self.k[self.curr] = k
     self.curr = self.curr + 1
+
+    if self.curr == self.taskspth then
+        return true
+    end
+
+    -- not full, over the maximum or empty
+    return false 
 end
 
 terra l1MTComputation(args: &opaque) : &opaque

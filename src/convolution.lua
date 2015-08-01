@@ -193,7 +193,7 @@ terra print2D(A : &number, M : int, N : int)
 	cstdio.printf("\n")
 end
 
-function genconvolution(NB,NBF,RM,RN,V,K,L)
+function genconvolution(NB,NBF,RM,RN,V,K,L,thsize)
 	-- Lowering type according to CcT (http://arxiv.org/abs/1504.04343)
 	local ltype = 1
 	
@@ -202,7 +202,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L)
 	
 	-- naive gemm for borders	
 	-- local my_loweredimg = genLowImage(NB, NBF, RM, RN, V, K, L)
-	local my_gemmopt = generatedgemm(NB,5,RM,RN,V)
+	local my_gemmopt = generatedgemm(18,5,RM,RN,V,thsize)
 	local my_naivegemm = gennaivegemm()
 	local my_loweredimg = genlowimage(ltype)
 	local my_loweredker = genlowkernel(ltype)
@@ -314,6 +314,7 @@ local regblocksN = {4}--1,2,4,8}
 local vectors = {1}--,2,4,8,16}
 local filters = {3}--,5,7,11}
 local nfilter = {3}--,3,10,40} --10,100,200,1024}--,2,3}
+local nthread = {1}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NB2 = 5
@@ -323,40 +324,42 @@ if dotune then
 	local tunefor = 8--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-	for _,f in ipairs(nfilter) do
-		for _,k in ipairs(filters) do
-			for _,b in ipairs(blocksizes) do
-				for _,rm in ipairs(regblocksM) do
-					for _,rn in ipairs(regblocksN) do
-						for _,v in ipairs(vectors) do				
-								-- local my_conv = gennaiveconv()
-							local my_conv = genconvolution(18,NB2,rm,rn,v,k,k)
-							-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
-							if my_conv then
-								print(b,rm,rn,v,k,f)
-								my_conv:compile()
-								
-								-- bellow line makes do not need boundary cases (image multiple of blocksize)
-								local i = math.floor(tunefor / b) * b
-								local curr_gflops = 0
-								local ctyp
-								local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
-									function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
-										-- to gennaive pass the #kernels here
-			                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
-			                    		-- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
-								end)
-								-- test only GEMM
-								-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
-								-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
-								-- end)
-								if not correct then	print("<error>") break end
-								print(i,unpack (exectimes),"[OK]")
-								local curr_gflops = exectimes[1]
-								-- print(curr_gflops) -- print analysis 
-								if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-									best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
-									terralib.tree.printraw(best)
+	for _,t in ipairs(nthread) do
+		for _,f in ipairs(nfilter) do
+			for _,k in ipairs(filters) do
+				for _,b in ipairs(blocksizes) do
+					for _,rm in ipairs(regblocksM) do
+						for _,rn in ipairs(regblocksN) do
+							for _,v in ipairs(vectors) do				
+									-- local my_conv = gennaiveconv()
+								local my_conv = genconvolution(18,NB2,rm,rn,v,k,k,t)
+								-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
+								if my_conv then
+									print(b,rm,rn,v,k,f)
+									my_conv:compile()
+									
+									-- bellow line makes do not need boundary cases (image multiple of blocksize)
+									local i = math.floor(tunefor / b) * b
+									local curr_gflops = 0
+									local ctyp
+									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
+										function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
+											-- to gennaive pass the #kernels here
+				                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
+				                    		-- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
+									end)
+									-- test only GEMM
+									-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
+									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
+									-- end)
+									if not correct then	print("<error>") break end
+									print(i,unpack (exectimes),"[OK]")
+									local curr_gflops = exectimes[1]
+									-- print(curr_gflops) -- print analysis 
+									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+										best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
+										terralib.tree.printraw(best)
+									end
 								end
 							end
 						end
@@ -369,7 +372,7 @@ end
 
 -- local my_convolution = gennaiveconv()
 
-local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v)
+local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v,1)
 if number == double then
 	terralib.saveobj("my_dconv.o", {my_convolution = my_convolution})
 else

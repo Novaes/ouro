@@ -1,14 +1,15 @@
 require "lib/mthreads"
 local stdlib = terralib.includec("stdlib.h")
+local cmath = terralib.includec("math.h")
 local cstdio = terralib.includec("stdio.h")
 local MT = terralib.includec("pthread.h")
 
 local number = double
 local alignment = 8
 local dotune = false
-local thsize = 1
+-- local thsize = 1
 -- area tunefor/area blocks / thsize
-local taskspth = 4
+-- local taskspth = 4
 
 function symmat(name,I,...)
 	if not I then return symbol(name) end
@@ -129,7 +130,7 @@ function blockedloop(N,M,K,blocksizes,bodyfn)
   return generatelevel(1,0,0,0,N,M,K) 
 end
 
-function generatedgemm(NB,NBF,RM,RN,V)
+function generatedgemm(NB,NBF,RM,RN,V,thsize)
 	--[[
 	if not isinteger(NB/(RN*V)) or not isinteger(NB/RM) then
 		return false
@@ -143,13 +144,39 @@ function generatedgemm(NB,NBF,RM,RN,V)
 
 	return terra(gettime : {} -> double, M : int, N : int, K : int, alpha : number, A : &number, lda : int, B : &number, ldb : int, 
 		            C : &number, ldc : int)
-	    var threads : MT.pthread_t[thsize]
-	    var count = 0
- 	    var pkgs : L1Package[thsize]
+		    
+		var thwork : int = ldc*ldc/(NB*NB)
+		 cstdio.printf("THWORK: %d",thwork)
+		-- thread adjusts
+		var thr : int = thsize
+		-- #threads is greater than the work
+		while (cmath.floor(thwork / thr) == 0) do
+			thr = thr - 1
+		end
+		var tmp : number = thwork 
+		var ftaskspth : number = tmp / thr
+		var taskspth : int = thwork / thr
+		
+		-- adjust in case of not perfect division
+		 cstdio.printf("ftaskspth: %f\n",ftaskspth)
+		 cstdio.printf("taskspth: %d\n",taskspth)
+		var rr : int = 0
+		if ftaskspth ~= taskspth then
+			rr = thwork % taskspth
+		end
 
-	    for i=0, thsize do
-	        pkgs[i]:init(NB, M, N, K, A, lda, B, ldb, C, ldc, l1dgemm0b, l1dgemm0, l1dgemm1b, l1dgemm1, taskspth)
-	    end
+		var threads : MT.pthread_t[thsize]
+        var pkgs : L1Package[thsize]
+        var added = 0
+    	for i=0, thr do
+        	if rr > 0 then 
+        		added = 1
+				rr = rr - 1
+			end
+			pkgs[i]:init(NB, M, N, K, A, lda, B, ldb, C, ldc, l1dgemm0b, l1dgemm0, l1dgemm1b, l1dgemm1, taskspth+added)
+			added = 0
+		end
+		var count = 0
 
 		for mm = 0,M,NB2 do
 			for nn = 0,N,NB2 do
@@ -157,16 +184,14 @@ function generatedgemm(NB,NBF,RM,RN,V)
 					for m = mm,min(mm+NB2,M),NB do
 						for n = nn,min(nn+NB2,N),NB do
 							for k = kk,min(kk+NB2,K),NB do
-								cstdio.printf("COUNT: %d\n",count)
-								pkgs[count/taskspth]:addblock(m,n,k)
-				                cstdio.printf("adding to thread: %d\n",count/taskspth)
-				                if (count+1) % taskspth == 0 then
-				                  	cstdio.printf("---> thread launched: %d\n",count/taskspth)
-				                    if MT.pthread_create(&threads[count/taskspth], nil, l1MTComputation , &pkgs[count/taskspth]) ~= 0 then 
-				                    	 cstdio.printf("Thread #%u creation error\n",threads[count/taskspth])
-				                    end
-				                end
-				                count = count + 1
+								cstdio.printf("adding to thread: %d\n",count)
+								if pkgs[count]:addblock(m,n,k) then
+				                	if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
+			                    		cstdio.printf("Thread #%u creation error",threads[count])
+			                    	end
+			                    		cstdio.printf("---> thread launched: %d\n",count)
+			                    	count = count + 1
+			                    end
 							end
 						end
 					end
@@ -182,11 +207,11 @@ function generatedgemm(NB,NBF,RM,RN,V)
 		end end) ]
 		]]
 
-	   	for i=0,thsize do
-	        if MT.pthread_join(threads[i],nil) ~= 0 then
-	           cstdio.printf("Thread #%u join error\n",i) 
-	        end
-	    end
+	   	for i=0,thr do
+        	if MT.pthread_join(threads[i],nil) ~= 0 then
+        		-- cstdio.printf("Thread #%u join error\n",i) 
+        	end
+        end
 
 	end
 end
@@ -208,7 +233,7 @@ if dotune then
 				--
 				for _,v in ipairs(vectors) do
 					-- same until here
-					local my_dgemm = generatedgemm(b,5,rm,rn,v)
+					local my_dgemm = generatedgemm(b,5,rm,rn,v,1)
 					if my_dgemm then
 						print(b,rm,rn,v)
 						my_dgemm:compile()
@@ -236,10 +261,11 @@ if dotune then
 		end
 	end
 end
-
+--[[
 local my_dgemm = generatedgemm(best.b, 5, best.rm, best.rn, best.v)
 if number == double then
 	terralib.saveobj("my_dgemm.o", { my_dgemm = my_dgemm })
 else
 	terralib.saveobj("my_sgemm.o", { my_sgemm = my_dgemm })
 end
+]]
