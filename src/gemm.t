@@ -166,7 +166,10 @@ function generatedgemm(NB,NBF,RM,RN,V,thsize)
 		-- cstdio.printf("taskspth: %d\n",taskspth)
 		var rr : int = 0
 		if ftaskspth ~= taskspth then
-			rr = thwork % taskspth
+			rr = thwork%thr
+			if rr == 0 then
+				rr = (ftaskspth-taskspth)*thr
+			end
 		end
 
 		var threads : MT.pthread_t[thsize]
