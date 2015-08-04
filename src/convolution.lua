@@ -96,32 +96,35 @@ function gennaiveconv()
 	end
 end
 
-function genlowimage(loweringtype)
+function genlowimage(loweringtype,NB)
    
 	return terra(M : int, N : int, K : int, L: int, A : &number, AA : &number) 
 		if loweringtype == 1 then
-			var kAenterX : int = K/2
-			var kAenterY : int = L/2
-			var e = 0
-			for i=kAenterX, M-kAenterX do
-			    for j=kAenterY, N-kAenterY do
-		        	for m=0, K do
-		          		for n=0, L do
-				            var ii: int = i + (m - kAenterY)
-				            var jj: int = j + (n - kAenterX)
-				            if ii >= 0 and ii < M and jj >= 0 and jj < N then
-				            	AA[e] = A[ii * N + jj]
-				            else 
-				            	AA[e] = 0
-				            end
-				            e = e + 1
-			        	end
-			      	end
-			    end
+			var cx : int = K/2
+			var cy : int = L/2
+			var base : int
+			var elem : int			
+		 	for mm = cx,M-cx,NB do
+				for nn = cy,N-cy,NB do
+					for m = mm,min(mm+NB,M-cx) do
+						for n = nn,min(nn+NB,N-cy) do
+							for k=0, K do
+		          				for l=0, L do			      	
+				                    var ii: int = m + (k - cy)
+							        var jj: int = n + (l - cx)
+									elem = (m-cx)*(N-2*cy)+(n-cy)
+							        base = K*L
+							        AA[elem*base + k*K+l] = A[ii * N + jj] 
+							    end
+							end
+						end
+					end
+				end
 			end
 		end
 	end
 end
+
 -- Different types according to Caffe con Troll can be implemented
 function genlowkernel(loweringtype)
 
@@ -136,7 +139,6 @@ function genlowkernel(loweringtype)
 			end
 		end
 	end
-
 end
 
 function liftresult(loweringtype) 
@@ -204,7 +206,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,thsize)
 	-- local my_loweredimg = genLowImage(NB, NBF, RM, RN, V, K, L)
 	local my_gemmopt = generatedgemm((NB*NB),5,RM,RN,V,thsize)
 	local my_naivegemm = gennaivegemm()
-	local my_loweredimg = genlowimage(ltype)
+	local my_loweredimg = genlowimage(ltype,NB)
 	local my_loweredker = genlowkernel(ltype)
 	local my_liftedresult = liftresult(ltype)
 
@@ -222,10 +224,11 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,thsize)
 		var Mlow, Nlow, Klow, Llow = sdc*ldc, K*L, K*L, depth
 
 		-- (1) lower
+		print2D(A,M,N)
 		my_loweredimg(M,N,K,L,A,AA)
-		-- print2D(AA,Mlow,Klow)
+		print2D(AA,Mlow,Klow)
 		my_loweredker(B,K,L,BB,Klow,Llow)
-		-- print2D(BB,Klow,Llow)
+		print2D(BB,Klow,Llow)
 			
 		-- (2) gemm
 		my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
@@ -309,7 +312,7 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
 
-local blocksizes = {48}--8,16,32,40,48,60}
+local blocksizes = {4}--,16,32,40,48,60}
 local regblocksM = {1}--1,2,4,8}
 local regblocksN = {4}--1,2,4,8}
 local vectors = {1}--,2,4,8,16}
@@ -322,7 +325,7 @@ local NB2 = 5
 
 if dotune then
 	-- full size of the matrix
-	local tunefor =1024--1024
+	local tunefor = 1024--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,t in ipairs(nthread) do
