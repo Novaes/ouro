@@ -96,6 +96,20 @@ function gennaiveconv()
 	end
 end
 
+-- function blockedloop(M,N,blocksizes,bodyfn)
+--   local function generatelevel(n,ii,jj,bb0,bb1)
+--     if n > #blocksizes then
+--       return bodyfn(ii,jj)
+--     end
+--     local blocksize = blocksizes[n]
+--     return quote for i = ii,min(ii+bb0,M),blocksize do
+--                    for j = jj,min(jj+bb1,N),blocksize do
+--                         [ generatelevel(n+1,i,j,blocksize,blocksize) ]
+--            		end end end
+--   end
+--   return generatelevel(1,0,0,M,N)
+-- end
+
 function genlowimage(loweringtype,NB)
    
 	return terra(M : int, N : int, K : int, L: int, A : &number, AA : &number) 
@@ -195,7 +209,7 @@ terra print2D(A : &number, M : int, N : int)
 	cstdio.printf("\n")
 end
 
-function genconvolution(NB,NBF,RM,RN,V,K,L,thsize)
+function genconvolution(NB,NBF,RM,RN,V,thsize)
 	-- Lowering type according to CcT (http://arxiv.org/abs/1504.04343)
 	local ltype = 1
 	
@@ -224,11 +238,11 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,thsize)
 		var Mlow, Nlow, Klow, Llow = sdc*ldc, K*L, K*L, depth
 
 		-- (1) lower
-		print2D(A,M,N)
+		-- print2D(A,M,N)
 		my_loweredimg(M,N,K,L,A,AA)
-		print2D(AA,Mlow,Klow)
+		-- print2D(AA,Mlow,Klow)
 		my_loweredker(B,K,L,BB,Klow,Llow)
-		print2D(BB,Klow,Llow)
+		-- print2D(BB,Klow,Llow)
 			
 		-- (2) gemm
 		my_gemmopt(nil,Mlow,Llow,Klow,1.0,AA ,Klow,BB ,Llow,CC,Llow)
@@ -312,7 +326,7 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
 
-local blocksizes = {4}--,16,32,40,48,60}
+local blocksizes = {4,15,20,30,48,50,60,120}--,16,32,40,48,60}
 local regblocksM = {1}--1,2,4,8}
 local regblocksN = {4}--1,2,4,8}
 local vectors = {1}--,2,4,8,16}
@@ -321,7 +335,7 @@ local nfilter = {3}--,3,10,40} --10,100,200,1024}--,2,3}
 local nthread = {48}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
-local NB2 = 5
+local NBF = 5
 
 if dotune then
 	-- full size of the matrix
@@ -336,7 +350,7 @@ if dotune then
 						for _,rn in ipairs(regblocksN) do
 							for _,v in ipairs(vectors) do				
 									-- local my_conv = gennaiveconv()
-								local my_conv = genconvolution(b,NB2,rm,rn,v,k,k,t)
+								local my_conv = genconvolution(b,NBF,rm,rn,v,t)
 								-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
 								if my_conv then
 									print(b,rm,rn,v,k,f)
