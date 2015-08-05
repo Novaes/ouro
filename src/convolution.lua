@@ -209,7 +209,7 @@ terra print2D(A : &number, M : int, N : int)
 	cstdio.printf("\n")
 end
 
-function genconvolution(NB,NBF,RM,RN,V,thsize)
+function genconvolution(NBL,NB,NBF,RM,RN,V,thsize)
 	-- Lowering type according to CcT (http://arxiv.org/abs/1504.04343)
 	local ltype = 1
 	
@@ -220,7 +220,7 @@ function genconvolution(NB,NBF,RM,RN,V,thsize)
 	-- local my_loweredimg = genLowImage(NB, NBF, RM, RN, V, K, L)
 	local my_gemmopt = generatedgemm((NB*NB),5,RM,RN,V,thsize)
 	local my_naivegemm = gennaivegemm()
-	local my_loweredimg = genlowimage(ltype,NB)
+	local my_loweredimg = genlowimage(ltype,NBL)
 	local my_loweredker = genlowkernel(ltype)
 	local my_liftedresult = liftresult(ltype)
 
@@ -336,6 +336,7 @@ local nthread = {48}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NBF = 5
+local bl = 8 -- lowering blocksize
 
 if dotune then
 	-- full size of the matrix
@@ -350,7 +351,7 @@ if dotune then
 						for _,rn in ipairs(regblocksN) do
 							for _,v in ipairs(vectors) do				
 									-- local my_conv = gennaiveconv()
-								local my_conv = genconvolution(b,NBF,rm,rn,v,t)
+								local my_conv = genconvolution(bl,b,NBF,rm,rn,v,t)
 								-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
 								if my_conv then
 									print(b,rm,rn,v,k,f)
