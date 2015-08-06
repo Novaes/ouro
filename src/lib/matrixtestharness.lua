@@ -12,8 +12,8 @@ function CalcTime(fn)
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	until times == 10
-	return (current - begin - adjust*times) / times 
+	until current - begin > 0.2
+  return (current - begin - adjust*times) / times 
 end
 
 local MTH = {}
