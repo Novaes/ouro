@@ -326,12 +326,12 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
 
-local blocksizes = {4,8,16,20}
+local blocksizes = {16,20,32}
 local regblocksM = {1,2,4}
 local regblocksN = {1,2,4}
-local vectors = {1,2,4,8,16}
-local filters = {3}
-local nfilter = {3}
+local vectors = {1,2,4,8}
+local filters = {3,7,13}
+local nfilter = {256}
 local nthread = {8}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
@@ -340,7 +340,7 @@ local bl = 8 -- lowering blocksize
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 32--1024
+	local tunefor = 128--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,t in ipairs(nthread) do
@@ -354,7 +354,7 @@ if dotune then
 								local my_conv = genconvolution(bl,b,NBF,rm,rn,v,t)
 								-- local my_conv = generatedgemm(b,NB2,rm,rn,v)
 								if my_conv then
-									print(b,rm,rn,v,k,f)
+								--	print(b,rm,rn,v,k,f)
 									my_conv:compile()
 									
 									-- bellow line makes do not need boundary cases (image multiple of blocksize)
@@ -371,14 +371,16 @@ if dotune then
 									-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
+                  print(b,rm,rn,v,k,f,time)
 									if not correct then	print("<error>") break end
-                  print("[OK] Time: "..time)
-									--print(i,unpack (exectimes),"[OK]")
+									
+								
+                  --print(i,unpack (exectimes),"[OK]")
 									local curr_gflops = exectimes[1]
 									-- print(curr_gflops) -- print analysis 
 									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
 										best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, k = k, f = f }
-										terralib.tree.printraw(best)
+										-- terralib.tree.printraw(best)
 									end
 								end
 							end

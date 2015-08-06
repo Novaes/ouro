@@ -12,7 +12,7 @@ function CalcTime(fn)
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	until (current - begin) > 0.2
+	until times == 10
 	return (current - begin - adjust*times) / times 
 end
 
