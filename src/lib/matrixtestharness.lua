@@ -12,7 +12,7 @@ function CalcTime(fn)
 		fn()
 		current = terralib.currenttimeinseconds()
 		times = times + 1
-	until (current - begin) > 0.2
+	until times == 10
 	return (current - begin - adjust*times) / times 
 end
 
@@ -55,7 +55,6 @@ function asserteq(C,CR,rows,cols,depth)
     end
     return true
 end
-
 
 function printMatrix(m,rows,columns,depth)
     local dim = rows * columns
@@ -184,15 +183,19 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 		Cfns[i] = Cs
 	end
 
-	-- compute 
+	-- compute; 
 	local results = {}
 	local checked = false
-	for i,fn in ipairs(fns) do
+  local time 
+   -- loop over all tested functions, so if you have more
+   -- than one time and checked will have multiple values (put them inside)
+	for i,fn in ipairs(fns) do  
 		local Cs = Cfns[i] -- 3D
 
 		local tocall = function() fn(Me,Ne,K,L,M,N,A,Bs,Cs,depth,AA,BB,CC) end
-		-- tocall()
-		results[i] = M*N*K*L*depth*2.0*1e-9 / CalcTime(tocall) -- gflop
+		--tocall()
+    time = CalcTime(tocall) 
+		results[i] = M*N*K*L*depth*2.0*1e-9 / time -- gflop
 		
 		-- Print in case detailed analysis
 		-- print("Image:")
@@ -226,7 +229,7 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 			end
 		end
 	end
-	return checked,results
+	return time,checked,results
 end
 
 function MTH.timefunctionsGEMM(typstring,M,K,N,...)
