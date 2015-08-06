@@ -123,13 +123,13 @@ function genlowimage(loweringtype,NB)
 					for m = mm,min(mm+NB,M-cx) do
 						for n = nn,min(nn+NB,N-cy) do
 							for k=0, K do
-		          				for l=0, L do			      	
-				                    var ii: int = m + (k - cy)
-							        var jj: int = n + (l - cx)
-									elem = (m-cx)*(N-2*cy)+(n-cy)
-							        base = K*L
-							        AA[elem*base + k*K+l] = A[ii * N + jj] 
-							    end
+		            for l=0, L do			      	
+				            var ii: int = m + (k - cy)
+							      var jj: int = n + (l - cx)
+								    elem = (m-cx)*(N-2*cy)+(n-cy)
+							      base = K*L
+							      AA[elem*base + k*K+l] = A[ii * N + jj] 
+							   end
 							end
 						end
 					end
@@ -326,13 +326,13 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
 
-local blocksizes = {4,15,20,30,48,50,60,120}--,16,32,40,48,60}
-local regblocksM = {1}--1,2,4,8}
-local regblocksN = {4}--1,2,4,8}
-local vectors = {1}--,2,4,8,16}
-local filters = {3}--,5,7,11}
-local nfilter = {3}--,3,10,40} --10,100,200,1024}--,2,3}
-local nthread = {48}
+local blocksizes = {4,8,16,20}
+local regblocksM = {1,2,4}
+local regblocksN = {1,2,4}
+local vectors = {1,2,4,8,16}
+local filters = {3}
+local nfilter = {3}
+local nthread = {8}
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NBF = 5
@@ -340,7 +340,7 @@ local bl = 8 -- lowering blocksize
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 1024--1024
+	local tunefor = 32--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,t in ipairs(nthread) do
@@ -361,7 +361,7 @@ if dotune then
 									local i = math.floor(tunefor / b) * b
 									local curr_gflops = 0
 									local ctyp
-									local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
+									local time,correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
 										function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
 											-- to gennaive pass the #kernels here
 				                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
@@ -372,7 +372,8 @@ if dotune then
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
 									if not correct then	print("<error>") break end
-									print(i,unpack (exectimes),"[OK]")
+                  print("[OK] Time: "..time)
+									--print(i,unpack (exectimes),"[OK]")
 									local curr_gflops = exectimes[1]
 									-- print(curr_gflops) -- print analysis 
 									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
