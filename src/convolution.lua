@@ -325,14 +325,15 @@ end
 -- Different blocksizes for the same result implies in padding overheading 
 -- ending in s means SIZE
 -- starting with n, means NUMBER
-
-local blocksizes = {16,20,32}
+ 
+local blocksizes = {8,16,32}
 local regblocksM = {1,2,4}
 local regblocksN = {1,2,4}
-local vectors = {1,2,4,8}
-local filters = {3,7,13}
-local nfilter = {256}
+local vectors = {1,2,4,8,16}
+local filters = {3}--{3,7,13}
+local nfilter = {15}--{256}
 local nthread = {8}
+
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NBF = 5
@@ -340,7 +341,7 @@ local bl = 8 -- lowering blocksize
 
 if dotune then
 	-- full size of the matrix
-	local tunefor = 128--1024
+	local tunefor = 32--1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
 	for _,t in ipairs(nthread) do
@@ -371,11 +372,9 @@ if dotune then
 									-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
-                  print(b,rm,rn,v,k,f,time)
+                  					-- print(b,rm,rn,v,k,f,time)
 									if not correct then	print("<error>") break end
-									
-								
-                  --print(i,unpack (exectimes),"[OK]")
+                  					--print(i,unpack (exectimes),"[OK]")
 									local curr_gflops = exectimes[1]
 									-- print(curr_gflops) -- print analysis 
 									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
@@ -392,18 +391,10 @@ if dotune then
 	end
 end
 
--- local my_convolution = gennaiveconv()
---[[
-local my_convolution = genconvolution(best.b,1,best.rm,best.rn,best.v,1)
+local my_numconv = genconvolution(bl,best.b,NBF,best.rm,best.rn,best.v,nthread[1])
 if number == double then
-	terralib.saveobj("my_dconv.o", {my_convolution = my_convolution})
+	terralib.saveobj("../bin/my_numconv.o", {my_numconv = my_numconv})
+	-- terralib.saveobj("../bin/my_dconv.o", {my_convolution = my_convolution})
 else
-	terralib.saveobj("my_sconv.o", {my_convolution = my_convolution})
+	terralib.saveobj("../bin/my_numconv.o", {my_numconv = my_numconv})
 end
-]]
--- local my_dgemm = generatedgemm(best.b, 5, best.rm, best.rn, best.v)
--- if number == double then
--- 	terralib.saveobj("my_dgemm.o", { my_dgemm = my_dgemm })
--- else
--- 	terralib.saveobj("my_sgemm.o", { my_sgemm = my_dgemm })
--- end
