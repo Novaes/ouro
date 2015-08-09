@@ -326,14 +326,13 @@ end
 -- ending in s means SIZE
 -- starting with n, means NUMBER
  
-local blocksizes = {8,16,32}
+local blocksizes = {16,20,32}
 local regblocksM = {1,2,4}
 local regblocksN = {1,2,4}
-local vectors = {1,2,4,8,16}
-local filters = {3}--{3,7,13}
-local nfilter = {15}--{256}
+local vectors = {1,2,4,8}
+local filters = {3,7,13}
+local nfilter = {256}
 local nthread = {8}
-
 -- initialized (defined structure of best)
 local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, k = 3, f = 3 }
 local NBF = 5
@@ -372,7 +371,7 @@ if dotune then
 									-- local correct, exectimes = harness.timefunctionsGEMM(tostring(number),i,i,i,function(M,K,N,A,B,C)
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
-                  					-- print(b,rm,rn,v,k,f,time)
+                  					print(b,rm,rn,v,k,f,time)
 									if not correct then	print("<error>") break end
                   					--print(i,unpack (exectimes),"[OK]")
 									local curr_gflops = exectimes[1]
