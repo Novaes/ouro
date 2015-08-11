@@ -2,7 +2,7 @@ local cstdlib = terralib.includec("stdlib.h")
 local cstdio = terralib.includec("stdio.h")
 local number = double
 
-struct L1Package{
+struct DirL1Package{
     NB: int
     l1conv : {&number, &number, &number, int, int, int, int, int, number} -> {}
     l1convb : {&number, &number, &number, int, int, int, int, int, number, int64, int64} -> {}
@@ -24,7 +24,7 @@ struct L1Package{
     cy : int
 }
 
-terra L1Package:init(NB: int, M : int, N : int, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number,
+terra DirL1Package:init(NB: int, M : int, N : int, A : &number, sda: int, lda : int, B : &number, ldb : int, C : &number,
         sdc : int, ldc : int, 
         l1conv : {&number, &number, &number, int, int, int, int, int, number} -> {}, 
         l1convb : {&number, &number, &number, int, int, int, int, int, number, int64, int64} -> {}, 
@@ -55,7 +55,7 @@ terra min(a : int, b : int)
     return terralib.select(a < b, a, b)
 end
 
-terra L1Package:addblock(m: int, n: int)
+terra DirL1Package:addblock(m: int, n: int)
     -- cstdio.printf("CURRENT: %d | MAX: %d\n",self.curr,self.taskspth)
     if self.curr >= self.taskspth then
         cstdio.printf("Trying to insert (%d,%d) task in a full thread\n",m,n)
@@ -73,8 +73,8 @@ terra L1Package:addblock(m: int, n: int)
     return false 
 end
 
-terra l1MTComputation(args: &opaque) : &opaque
-    var f : &L1Package = [&L1Package](args)
+terra dirl1MTComputation(args: &opaque) : &opaque
+    var f : &DirL1Package = [&DirL1Package](args)
     -- check received args problem
     var NB : int = (@f).NB
     var l1conv : {&number,&number,&number, int, int, int, int, int, number} -> {} = (@f).l1conv

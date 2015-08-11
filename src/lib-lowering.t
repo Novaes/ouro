@@ -7,7 +7,7 @@ local number = double
 local function isinteger(x) return math.floor(x) == x end
 local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
 
-local dotune = true
+local dotune = false
 
 -- terra naivel1conv(A : &number, B : &number, C : &number, lda : int, ldb : int, ldc : int, alpha : number)
 function symmat(name,I,...)

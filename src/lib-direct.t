@@ -11,7 +11,7 @@ local number = double
 local function isinteger(x) return math.floor(x) == x end
 local llvmprefetch = terralib.intrinsic("llvm.prefetch",{&opaque,int,int,int} -> {})
 
-local dotune = true
+local dotune = false
 
 -- terra naivel1conv(A : &number, B : &number, C : &number, lda : int, ldb : int, ldc : int, alpha : number)
 function symmat(name,I,...)
@@ -265,7 +265,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,NF,thsize)
 		end
 
 		var threads : MT.pthread_t[thsize]
-        var pkgs : L1Package[thsize]
+        var pkgs : DirL1Package[thsize]
         var added = 0
     	for i=0, thr do
         	if rr > 0 then 
@@ -287,7 +287,7 @@ function genconvolution(NB,NBF,RM,RN,V,K,L,NF,thsize)
 					for n = nn,min(nn+NB2,N),NB do
 						-- cstdio.printf("adding to thread: %d\n",count)	
 				 		if pkgs[count]:addblock(m,n) then
-		                	if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
+		                	if MT.pthread_create(&threads[count], nil, dirl1MTComputation , &pkgs[count]) ~= 0 then 
 	                    		-- cstdio.printf("Thread #%u creation error",threads[count])
 	                    	end
 	                    	-- cstdio.printf("---> thread launched: %d\n",count)
@@ -342,8 +342,6 @@ if dotune then
 										print(k,f,t,b,rm,rn)
 										my_conv:compile()
 										-- bellow line makes do not need boundary cases (image multiple of blocksize)
-										
-										local curr_gflops = 0
 										local ctyp
 										local correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(Me,Ne,K,L,M,N,A,B,C,f)
 											-- to gennaive pass the #kernels here
