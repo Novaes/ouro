@@ -1,4 +1,4 @@
-require("lib/directmthreads")
+require("lib/dir-mthreads")
 local IO = terralib.includec("stdio.h")
 local stdlib = terralib.includec("stdlib.h")
 local MT = terralib.includec("pthread.h")
@@ -326,7 +326,7 @@ local NB2 = 5
 if dotune then
 	local tunefor = 127 -- full size of the matrix
 	--change for 10 later
-	local harness = require("lib/matrixtestharnessDIRECT")
+	local harness = require("lib/dir-matrixtestharness")
 	for _,k in ipairs(filters) do
 		for _,f in ipairs(nfilter) do
 			for _,t in ipairs(nthread) do

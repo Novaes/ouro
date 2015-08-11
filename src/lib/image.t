@@ -1,3 +1,7 @@
+-- This file is adapted for this project needs from Darkroom's image lib 
+-- (https://github.com/jameshegarty/darkroom)
+
+
 local cstdio = terralib.includec("stdio.h")
 local cstdlib = terralib.includec("stdlib.h")
 local cstring = terralib.includec("string.h")

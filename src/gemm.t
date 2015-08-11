@@ -1,4 +1,5 @@
-require "lib/mthreads"
+-- It is the standard GEMM from Terra, but Multi-threaded
+require "lib/low-mthreads"
 local stdlib = terralib.includec("stdlib.h")
 local cmath = terralib.includec("math.h")
 local cstdio = terralib.includec("stdio.h")
