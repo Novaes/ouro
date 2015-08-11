@@ -342,7 +342,7 @@ if dotune then
 	-- full size of the matrix
 	local tunefor = 32--1024
 	--change for 10 later
-	local harness = require("lib/matrixtestharness")
+	local harness = require("lib/matrixtestharnessLOWERING")
 	for _,t in ipairs(nthread) do
 		for _,f in ipairs(nfilter) do
 			for _,k in ipairs(filters) do
