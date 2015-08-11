@@ -190,12 +190,13 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 	-- compute 
 	local results = {}
 	local checked = false
+	local time
 	for i,fn in ipairs(fns) do
 		local Cs = Cfns[i] -- 3D
 		local tocall = function() fn(Me,Ne,K,L,M,N,A,Bs,Cs,depth) end
 
-		tocall()
-		results[i] = M*N*K*L*depth*2.0*1e-9 / CalcTime(tocall) -- gflop
+		time = CalcTime(tocall)
+		results[i] = M*N*K*L*depth*2.0*1e-9 /  time-- gflop
 		
 		-- Print in case detailed analysis
 		-- print("Image:")
@@ -244,7 +245,7 @@ function MTH.timefunctions(typstring,M,N,K,L,depth,...)
 			end
 		end
 	end
-	return checked,results
+	return time,checked,results
 end
 
 return MTH

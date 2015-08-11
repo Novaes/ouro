@@ -365,7 +365,5 @@ if dotune then
 		end
 	end
 
-  terralib.tree.printraw(best)
-
 -- local my_convolution = genDirconv(best.b,NB2,best.rm,best.rn,best.v,best.k,best.k,best.f,best.t,best.jobs)
 -- terralib.saveobj("my_conv.o", {my_convolution = my_convolution})
