@@ -220,7 +220,6 @@ function gencmul(NB,NBF,RM,RN)
 
 	local NB2 = NB * NBF
 	local l1cmul = gencmulkernel(NB, RM, 2*RN, true)
-
 	return terra(M : int, N : int, A : &double, B : &double, C : &double, 
 		ldc : int) 
          [ blockedloop(N,M,{NB2,NB},
@@ -297,10 +296,10 @@ function genNumRecipesConv()
 		-- l1transpose(B,0)
 
 		-- (3) point-wise multiplication
-		printCMatrix("[A]:",M,N,A)
-		printCMatrix("[B]:",M,N,B)
+		-- printCMatrix("[A]:",M,N,A)
+		-- printCMatrix("[B]:",M,N,B)
 		naivecmul(A,B,C,M,N)
-        printCMatrix("[C]:",M,N,C)
+        -- printCMatrix("[C]:",M,N,C)
 
 		-- (4) calculate 2D IFFT of the result
         for j=0,M do
@@ -331,7 +330,7 @@ function genfastconvMT(NB,NBF,RM,RN,V,DIMSIZE,thsize)
 	local l1invfft = genfftkernel(DIMSIZE,-1)
 
 	return terra(gettime : {} -> double, M : int, N : int, A : &double, B : &double, C : &double, 
-		ldc : int)
+		ldc : int, depth : int)
 
 		-- Thread management
 		var thwork = M
@@ -353,7 +352,7 @@ function genfastconvMT(NB,NBF,RM,RN,V,DIMSIZE,thsize)
 		end
 
 		var threads : MT.pthread_t[thsize]
-		var pkgs : L1Package[thsize]
+		var pkgs : FFTL1Package[thsize]
 		var added = 0
 		for i=0, thr do
 			if rr > 0 then 
@@ -369,7 +368,7 @@ function genfastconvMT(NB,NBF,RM,RN,V,DIMSIZE,thsize)
 		for j=0,M do
 			var base = j*N*2
 			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
+				if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
 					-- cstdio.printf("Thread #%u creation error",threads[count])
 				end
 				-- cstdio.printf("---> thread launched: %d\n",count)
@@ -383,15 +382,13 @@ function genfastconvMT(NB,NBF,RM,RN,V,DIMSIZE,thsize)
 	    	end
 		end
 		transposeCMatrix(M, N, A)
-
-
 		
 		count = 0
 		for i=0, thr do pkgs[i]:clear()	end
 		for j=0,M do
 			var base = j*N*2
 			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
+				if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
 					-- cstdio.printf("Thread #%u creation error",threads[count])
 				end
 				-- cstdio.printf("---> thread launched: %d\n",count)
@@ -406,109 +403,113 @@ function genfastconvMT(NB,NBF,RM,RN,V,DIMSIZE,thsize)
 
 		transposeCMatrix(M, N, A)
 
-		-- (2) 2D kernel convolution
-		-- printCMatrix("[B]:",M,N,BB)
-		for i=0, thr do
-			pkgs[i]:usefilter() -- it clear already
-		end
-		count = 0
-		for j=0,M do
-			var base = j*N*2
-			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
-					-- cstdio.printf("Thread #%u creation error",threads[count])
-				end
-				-- cstdio.printf("---> thread launched: %d\n",count)
-				count = count + 1
+
+		-- Init of MULTIPLE KERNELS
+		for d=0, depth do
+			-- (2) 2D kernel convolution
+			-- printCMatrix("[B]:",M,N,BB)
+			for i=0, thr do
+				pkgs[i]:usefilter() -- it clear already
 			end
-		end
-		
-		for i=0,thr do
-	    	if MT.pthread_join(threads[i],nil) ~= 0 then
-	        	-- cstdio.printf("Thread #%u join error\n",i) 
-	    	end
-		end
-		
-		transposeCMatrix(M, N, B)
-		
-		for i=0, thr do	pkgs[i]:clear()	end
-		count = 0
-		for j=0,M do
-			var base = j*N*2
-			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
-					-- cstdio.printf("Thread #%u creation error",threads[count])
+			count = 0
+			for j=0,M do
+				var base = d*M*M  +  j*N*2
+				if pkgs[count]:addblock(base) then
+					if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
+						-- cstdio.printf("Thread #%u creation error",threads[count])
+					end
+					-- cstdio.printf("---> thread launched: %d\n",count)
+					count = count + 1
 				end
-				-- cstdio.printf("---> thread launched: %d\n",count)
-				count = count + 1
 			end
-		end
-
-		for i=0,thr do
-	    	if MT.pthread_join(threads[i],nil) ~= 0 then
-	        	-- cstdio.printf("Thread #%u join error\n",i) 
-	    	end
-		end
-		transposeCMatrix(M, N, B)
-
-		-- (3) point-wise multiplication
-		-- printCMatrix("[A 2D convolved]:",M,N,A)
-		-- printCMatrix("[B 2D convolved]:",M,N,B)
-		fullcmul(M,N,A,B,C,N)
-		-- printCMatrix("[Pointwise multiplied]:",M,N,C)
-
-		
-    	-- (4) calculate 2D IFFT of the result
-    	for i=0, thr do
-			pkgs[i]:useoutput() -- it clear already
-		end
-		count = 0
-
-        for j=0,M do
-			var base = j*N*2
-			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
-					-- cstdio.printf("Thread #%u creation error",threads[count])
+			
+			for i=0,thr do
+		    	if MT.pthread_join(threads[i],nil) ~= 0 then
+		        	-- cstdio.printf("Thread #%u join error\n",i) 
+		    	end
+			end
+			
+			transposeCMatrix(M, N, B + d*M*N)
+			
+			for i=0, thr do	pkgs[i]:clear()	end
+			count = 0
+			for j=0,M do
+				var base = d*M*N + j*N*2
+				if pkgs[count]:addblock(base) then
+					if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
+						-- cstdio.printf("Thread #%u creation error",threads[count])
+					end
+					-- cstdio.printf("---> thread launched: %d\n",count)
+					count = count + 1
 				end
-				-- cstdio.printf("---> thread launched: %d\n",count)
-				count = count + 1
 			end
-		end
-		
-		for i=0,thr do
-	    	if MT.pthread_join(threads[i],nil) ~= 0 then
-	        	cstdio.printf("Thread #%u join error\n",i) 
-	    	end
-		end
 
-		transposeCMatrix(M, N, C)
-		
-		for i=0, thr do	
-			pkgs[i]:clear()	
-		end
-		count = 0
+			for i=0,thr do
+		    	if MT.pthread_join(threads[i],nil) ~= 0 then
+		        	-- cstdio.printf("Thread #%u join error\n",i) 
+		    	end
+			end
+			transposeCMatrix(M, N, B + d*N*N)
 
-		for j=0,M do
-			var base = j*N*2
-			if pkgs[count]:addblock(base) then
-				if MT.pthread_create(&threads[count], nil, l1MTComputation , &pkgs[count]) ~= 0 then 
-					-- cstdio.printf("Thread #%u creation error",threads[count])
+			-- (3) point-wise multiplication
+			-- printCMatrix("[A 2D convolved]:",M,N,A)
+			-- printCMatrix("[B 2D convolved]:",M,N,B)
+
+			fullcmul(M,N,A,B + d*N*N, C + d*N*N,N)
+			-- printCMatrix("[Pointwise multiplied]:",M,N,C)
+
+			
+	    	-- (4) calculate 2D IFFT of the result
+	    	for i=0, thr do
+				pkgs[i]:useoutput() -- it clear already
+			end
+			count = 0
+
+	        for j=0,M do
+				var base = d*N*N + j*N*2
+				if pkgs[count]:addblock(base) then
+					if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
+						-- cstdio.printf("Thread #%u creation error",threads[count])
+					end
+					-- cstdio.printf("---> thread launched: %d\n",count)
+					count = count + 1
 				end
-				-- cstdio.printf("---> thread launched: %d\n",count)
-				count = count + 1
 			end
-		end
+			
+			for i=0,thr do
+		    	if MT.pthread_join(threads[i],nil) ~= 0 then
+		        	-- cstdio.printf("Thread #%u join error\n",i) 
+		    	end
+			end
 
-		for i=0,thr do
-	    	if MT.pthread_join(threads[i],nil) ~= 0 then
-	        	-- cstdio.printf("Thread #%u join error\n",i) 
-	    	end
-		end
+			transposeCMatrix(M, N, C + d*N*N)
+			
+			for i=0, thr do	
+				pkgs[i]:clear()	
+			end
+			count = 0
 
-		transposeCMatrix(M, N, C)
-		-- printCMatrix("[C]:",M,N,A)
+			for j=0,M do
+				var base = j*N*2 + d*N*N
+				if pkgs[count]:addblock(base) then
+					if MT.pthread_create(&threads[count], nil, fftl1MTComputation , &pkgs[count]) ~= 0 then 
+						-- cstdio.printf("Thread #%u creation error",threads[count])
+					end
+					-- cstdio.printf("---> thread launched: %d\n",count)
+					count = count + 1
+				end
+			end
+
+			for i=0,thr do
+		    	if MT.pthread_join(threads[i],nil) ~= 0 then
+		        	-- cstdio.printf("Thread #%u join error\n",i) 
+		    	end
+			end
+
+			transposeCMatrix(M, N, C + d*N*N)
+			-- printCMatrix("[C]:",M,N,A)
+		end
 	end
-
 end
 
 function genfastconv(NB,NBF,RM,RN,V,FULLIMAGESIZE)
@@ -578,22 +579,27 @@ function genfastconv(NB,NBF,RM,RN,V,FULLIMAGESIZE)
 		transposeCMatrix(M, N, C)
 	end
 end
- 
-function genfftkernel(NFFT, signal)
-	local A, ker, K_W = symbol("A"), symmat("ker",2,2), symbol("K_W")
-	local stotal, rest, s = symbol("stotal"), symbol("rest"), symbol("s")
-	local NELEMS, k, Ns = symbol("NELEMS"), symbol("k"), symbol("Ns")
-	local skernel, base, ublocks =  symbol("skernel"), symbol("base"), symbol("ublocks")
-	local exec, bitreversal = terralib.newlist(), terralib.newlist()	
-	local ker = {}
 
+function genfftkernel(NFFT, signal) -- NFFT is equal to NB*NB
+	local A = symbol("A")
+	local stotal, rest, s, NELEMS, k, Ns = symbol("stotal"), symbol("rest"), symbol("s"), symbol("NELEMS"), symbol("k"), symbol("Ns")
+	local K_W, skernel, base, ublocks = symbol("K_W"), symbol("skernel"), symbol("base"), symbol("ublocks")
+	local ker = symmat("ker",2,2)
+	local exec, bitreversal = terralib.newlist(), terralib.newlist()
+	
+	local ker = {}
 	ker[0], ker[1] = {}, {}
-	ker[0][0], ker[0][1] = 4, 2 -- kernel of 4 points; 2 stages
-	ker[1][0], ker[1][1] = 2, 1 -- kernel of 2 points; 1 stage
+	ker[0][0] = 4 -- kernel of 4 points
+	ker[0][1] = 2 -- 2 stages
+	ker[1][0] = 2 -- kernel of 2 points
+	ker[1][1] = 1 -- 1 stage
+ 	
  	stotal = math.floor(math.log(NFFT)/math.log(2)) -- log2(NFFT) to #stages
 	rest = stotal
-	s, k, Ns = 0,0,1 -- s: current stage
+	s = 0 -- current stage
 	NELEMS = NFFT
+	k = 0
+	Ns = 1
 	
 	repeat
 		-- #stages that type of kernel absorb is lower or equal lacking #stages
@@ -603,9 +609,12 @@ function genfftkernel(NFFT, signal)
 			base  = 0
 			ublocks = NELEMS/K_W
 			rest = rest - skernel
+			-- cstdio.printf("#BLOCKS: %d  K_W: %d\n",ublocks,K_W)
+			-- cstdio.printf("#INNER ITER: %d\n",Ns)
 			for i=0,ublocks-1 do -- loop over big ublocks
 				base = i*(Ns*K_W*2) -- iterate over the big ublocks, K_W*2 each elem size
 				for j=0, Ns-1 do -- inside each block
+					-- cstdio.printf("BASE: %d Ns: %d\n",base + 2*j,Ns)
 					if k == 0 then
 						exec:insert(quote
 							FFT_4(base + 2*j,A,Ns,NFFT,signal)
@@ -633,6 +642,8 @@ function genfftkernel(NFFT, signal)
 	return terra([A] : &double)
 		[exec];
 		[bitreversal];
+		-- printCMatrix("[4 kernel]:",NFFT,NFFT,A)
+		-- cstdio.printf("A: %1.f\n",A[0])
 	end
 end
 
@@ -668,50 +679,52 @@ function blockedComplexloop(M,N,blocksizes,bodyfn)
   return generatelevel(1,0,0,M,N)
 end
 
-local blocksizes = {8--[[16,24,32,40,48,56,64,1024]]}
-local regblocks = {1}--{1,2,4} -- blocksizes must be divisible by RN*V
+local blocksizes = {8,16,32}
+local regblocks = {1,2,4} -- blocksizes must be divisible by RN*V
 local vectors = {1--[[1,2,4,8]]}
 local nthread = {2}
+local nfilter = {5}
 -- initialized (defined structure of best)
-local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1 }
+local best = { gflops = 0, b = 5, rm = 5, rn = 5, v = 1, t = 1 }
 
 -- kernel dependent 
-local tunefor = 128 -- full size of the matrix
+local tunefor = 32 -- full size of the matrix
 if dotune then
 	-- local tunefor = 1024
 	--change for 10 later
 	local harness = require("lib/matrixtestharness")
-	for _,b in ipairs(blocksizes) do
-		for _,rm in ipairs(regblocks) do
-			for _,rn in ipairs(regblocks) do
-				for _,v in ipairs(vectors) do
-					for _,t in ipairs(nthread) do
-						-- FOR FAST CONVOLUTION THE KERNEL IS DEPENDENT OF THE IMAGE SIZE
-						local i = math.floor(tunefor / b) * b
-						-- local my_fastconv = genNumRecipesConv()
-						local my_fastconv = genfastconvMT(b,1,rm,rn,v,tunefor,t)
-						-- local my_fastconv = genfastconv(b,1,rm,rn,v,tunefor)
-						-- local my_cmul = gencmul(b,1,rm,rn,v)
-						if my_fastconv then
-							print(b,rm,rn,v)
-							my_fastconv:compile()
-							local curr_gflops = 0
-							local ctyp
-							local caltime, correct, exectimes = harness.timefunctionsFFT(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C) 
-		                    	my_fastconv(nil,M,N,A,B,C,N)                  	
-							end)
-							-- local correct, exectimes = harness.timefunctionsCMUL(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C) 
-		                    	-- my_cmul(nil,M,N,A,B,C,N)	                    	
-							-- end)
-							-- if not correct then	("<error>")  break  end
-							-- print(i,unpack (exectimes))
-							best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-							print(caltime)
-							-- local curr_gflops = exectimes[1]
-							-- if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-							-- 	best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
-							-- 	terralib.tree.printraw(best)
-							-- end
+	for _,f in ipairs(nfilter) do
+		for _,b in ipairs(blocksizes) do
+			for _,rm in ipairs(regblocks) do
+				for _,rn in ipairs(regblocks) do
+					for _,v in ipairs(vectors) do
+						for _,t in ipairs(nthread) do
+							-- FOR FAST CONVOLUTION THE KERNEL IS DEPENDENT OF THE IMAGE SIZE
+							local i = math.floor(tunefor / b) * b
+							-- local my_fastconv = genNumRecipesConv()
+							local my_fastconv = genfastconvMT(b,1,rm,rn,v,tunefor,t)
+							-- local my_fastconv = genfastconv(b,1,rm,rn,v,tunefor)
+							-- local my_cmul = gencmul(b,1,rm,rn,v)
+							if my_fastconv then
+								my_fastconv:compile()
+								local curr_gflops = 0
+								local ctyp
+								local caltime, correct, exectimes = harness.timefunctionsFFT(tostring(number),i,i,3,3,f, function(M,N,K,L,A,B,C,NF) 
+			                    	my_fastconv(nil,M,N,A,B,C,N,NF)
+								end)
+								-- local correct, exectimes = harness.timefunctionsCMUL(tostring(number),i,i,3,3, function(M,N,K,L,A,B,C) 
+			                    	-- my_cmul(nil,M,N,A,B,C,N)	                    	
+								-- end)
+								-- if not correct then	("<error>")  break  end
+								-- print(i,unpack (exectimes))
+								best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v }
+								print(b,rm,rn,v,t,caltime)
+								-- local curr_gflops = exectimes[1]
+								if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
+									best = { gflops = curr_gflops, b = b, rm = rm, rn = rn, v = v, t = t}
+									terralib.tree.printraw(best)
+								end
+							end
 						end
 					end
 				end
@@ -720,5 +733,5 @@ if dotune then
 	end
 end
 
-local my_convolution = genfastconv(best.b,1,best.rm,best.rn,best.v,tunefor)
+local my_convolution = genfastconv(best.b,1,best.rm,best.rn,best.v,tunefor,best.t)
 terralib.saveobj("../bin/my_numconv.o", {my_numconv = my_convolution})

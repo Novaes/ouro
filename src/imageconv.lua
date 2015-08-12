@@ -318,7 +318,6 @@ local terra loadAndRun(argc: int, argv: &rawstring)
   
   -- convolve
   ker:flip()
-
   inp:convolve(ker)
   -- inp:naiveconv(ker)
   

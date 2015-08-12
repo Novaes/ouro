@@ -1,5 +1,7 @@
 require "direct"
 require "lowering"
+require "fftbased"
+
 -- General Parameters
 local dotune = true
 local filters = {3}
@@ -8,11 +10,11 @@ local nthread = {8}
 local tunefor = 32
 local number = double
 -- Flags
-local perf = false -- see all time or gflops on a parameter tested
+local perf = false -- see all time or time on a parameter tested
 local trackbest = false -- every time you have a new best kernel, show its parameters 
 local method
 
-local best = { gflops = 0, filter_size = 3, filters = 3, block_size = 5, rm = 5, rn = 5, vector_size = 1, threads = 3, method = "direct"}
+local best = { time = 10, filter_size = 3, filters = 3, block_size = 5, rm = 5, rn = 5, vector_size = 1, threads = 3, method = "direct"}
 
 -- Direct auto-tuner
 local blocksizes = {16,32}
@@ -39,17 +41,14 @@ if dotune then
 										if perf then print(k,f,t,b,rm,rn) end
 										my_conv:compile()
 										-- bellow line makes do not need boundary cases (image multiple of blocksize)
-										local ctyp
-										local time,correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(Me,Ne,K,L,M,N,A,B,C,f)
+										local curr_time, correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(Me,Ne,K,L,M,N,A,B,C,f)
 											-- to gennaive pass the #kernels here
 					                    	my_conv(nil,Me,Ne,K,L,1.0,A,Me,Ne,B,L,C,M,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 										end)
 										if not correct then	print("<error>") break end
-										print(b,rm,rn,v,k,f,time, "[OK]")
-										local curr_gflops = exectimes[1]
-										-- print(curr_gflops) -- print analysis 
-										if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-											best = { gflops = curr_gflops, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "direct" }
+										print(b,rm,rn,v,k,f,curr_time, "[OK]")
+										if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
+											best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "direct" }
 											if trackbest then 
 												terralib.tree.printraw(best)
 											end
@@ -66,7 +65,7 @@ if dotune then
 
 
 -- Lowering auto-tuner
-local blocksizes = {16}--{16,20,32}
+local blocksizes = {16,20,32}
 local regblocksM = {1}--{1,2,4}
 local regblocksN = {2}--{1,2,4}
 local vectors = {1,2,4,8}
@@ -92,9 +91,8 @@ if dotune then
 									
 									-- bellow line makes do not need boundary cases (image multiple of blocksize)
 									local i = math.floor(tunefor / b) * b
-									local curr_gflops = 0
 									local ctyp
-									local time,correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
+									local curr_time,correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, 
 										function(Me,Ne,K,L,M,N,A,Bs,Cs,f,AA,BB,CC)
 											-- to gennaive pass the #kernels here
 				                    		my_conv(nil,A,Me,Ne,K,L,1.0,Bs,L,Cs,M,N,K/2,L/2,f,AA,BB,CC) 
@@ -105,11 +103,9 @@ if dotune then
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
 									if not correct then	print("<error>") break end
-									print(b,rm,rn,v,k,f,time, "[OK]")
-									local curr_gflops = exectimes[1]
-									-- print(curr_gflops) -- print analysis 
-									if best.gflops < curr_gflops then --  Maximization problem (the greater gflops, the better)
-										best = { gflops = curr_gflops, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "lowering" }
+									print(b,rm,rn,v,k,f,curr_time, "[OK]")
+									if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
+										best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "lowering" }
 										if trackbest then
 											terralib.tree.printraw(best)
 										end
@@ -124,6 +120,51 @@ if dotune then
 	end
 end
 
+
+local blocksizes = {8,16,32}
+local regblocks = {1,2,4} -- blocksizes must be divisible by RN*V
+local vectors = {1--[[1,2,4,8]]}
+local NBF = 1
+
+-- kernel dependent 
+if dotune then
+	print("\nApplying FFT based method: ")
+	local harness = require("lib/fft-matrixtestharness")
+	for _,f in ipairs(nfilter) do
+		for _,b in ipairs(blocksizes) do
+			for _,rm in ipairs(regblocks) do
+				for _,rn in ipairs(regblocks) do
+					for _,v in ipairs(vectors) do
+						for _,t in ipairs(nthread) do
+							-- FOR FAST CONVOLUTION THE KERNEL IS DEPENDENT OF THE IMAGE SIZE
+							local i = math.floor(tunefor / b) * b
+							
+							local my_fastconv = genfastconvMT(b,1,rm,rn,v,tunefor,t)
+							-- local my_fastconv = genNumRecipesConv()
+							-- local my_fastconv = genfastconv(b,1,rm,rn,v,tunefor)
+							if my_fastconv then
+								my_fastconv:compile()
+								local curr_time, correct, exectimes = harness.timefunctionsFFT(tostring(number),i,i,3,3,f, function(M,N,K,L,A,B,C,NF) 
+			                    	my_fastconv(nil,M,N,A,B,C,N,NF)
+								end)
+								-- if not correct then	("<error>")  break  end
+								print(b,rm,rn,v,t,curr_time)
+								if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
+									best = {time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filters = f, threads = t, method = "FFT based" }
+									if trackbest then
+										terralib.tree.printraw(best)
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+
 print("\nBest method found: ")
 terralib.tree.printraw(best)
 
@@ -133,8 +174,10 @@ local my_numconv
 
 if best.method == "direct" then
 	my_numconv = genDirconv(best.block_size,NBF,best.rm,best.rn,best.vector_size,best.filter_size,best.filter_size,best.filters,best.threads)
-else
+elseif best.method == "lowering" then
 	my_numconv = genLoweringConv(bl,best.block_size,NBF,best.rm,best.rn,best.vector_size,best.threads)
+elseif best.method == "FFT based" then
+	my_numconv = genfastconvMT(best.block_size,1,best.rm,best.rn,best.vector_size,tunefor,best.threads)
 end
 
 if number == double then
