@@ -1,5 +1,5 @@
-require "lib/fftkernels"
-require "lib/mthreads"
+require "lib/fft-kernels"
+require "lib/fft-mthreads"
 local MT = terralib.includec("pthread.h")
 local cmath = terralib.includec("math.h")
 local cstdio = terralib.includec("stdio.h")
