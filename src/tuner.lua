@@ -1,3 +1,4 @@
+cstdio = terralib.includec("stdio.h")
 require "direct"
 require "lowering"
 require "fftbased"
@@ -10,8 +11,36 @@ local nthread = {8}
 local tunefor = 32
 local number = double
 -- Flags
-local perf = false -- see all time or time on a parameter tested
-local trackbest = false -- every time you have a new best kernel, show its parameters 
+-- io.write("\n Optimal kernels for convolution layers auto-tuner \n")
+-- io.write("\n              Stanford University \n")
+-- io.write("              (mnovaes@stanford.edu) \n")
+-- io.write("\n\n")
+-- io.write("Flags\n")
+-- io.write("perf: see all time or time on a parameter tested\n")
+-- io.write("trackbest: every time you have a new best kernel, show its parameters\n")
+-- io.write("\n")
+-- local flags = io.read("*all")
+
+-- FLAGS
+local perf = false
+local trackbest = false
+
+-- handle FLAGS 
+local argc = 0
+repeat 
+	str = arg[argc]
+	argc = argc + 1
+until arg[argc] == nil
+
+for i=0, argc-1 do
+	local str = arg[i]
+	if str == "--perf" then
+		perf = true  
+	elseif str == "--trackbest" then
+		trackbest = true
+	end
+end
+
 local method
 
 local best = { time = 10, filter_size = 3, filters = 3, block_size = 5, rm = 5, rn = 5, vector_size = 1, threads = 3, method = "direct"}
@@ -24,7 +53,7 @@ local vectors = {1}
 local NBF = 5
 
 if dotune then
-	print("\nApplying Direct method: ")
+	print("\nApplying Direct method ")
 	local harness = require("lib/dir-matrixtestharness")
 	for _,k in ipairs(filters) do
 		for _,f in ipairs(nfilter) do
@@ -38,7 +67,6 @@ if dotune then
 									-- local my_conv = gennaiveconv()
 									-- local my_conv = maxreuse()
 									if my_conv then
-										if perf then print(k,f,t,b,rm,rn) end
 										my_conv:compile()
 										-- bellow line makes do not need boundary cases (image multiple of blocksize)
 										local curr_time, correct, exectimes = harness.timefunctions(tostring(number),i,i,k,k,f, function(Me,Ne,K,L,M,N,A,B,C,f)
@@ -46,7 +74,7 @@ if dotune then
 					                    	my_conv(nil,Me,Ne,K,L,1.0,A,Me,Ne,B,L,C,M,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 										end)
 										if not correct then	print("<error>") break end
-										print(b,rm,rn,v,k,f,curr_time, "[OK]")
+										if perf then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
 										if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 											best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "direct" }
 											if trackbest then 
@@ -73,7 +101,7 @@ local NBF = 5
 local bl = 8 -- lowering blocksize
 
 if dotune then
-	print("\nApplying Lowering method: ")
+	print("\nApplying Lowering method ")
 	local harness = require("lib/low-matrixtestharness")
 	for _,t in ipairs(nthread) do
 		for _,f in ipairs(nfilter) do
@@ -103,7 +131,7 @@ if dotune then
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
 									if not correct then	print("<error>") break end
-									print(b,rm,rn,v,k,f,curr_time, "[OK]")
+									if perf then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
 									if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 										best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "lowering" }
 										if trackbest then
@@ -128,7 +156,7 @@ local NBF = 1
 
 -- kernel dependent 
 if dotune then
-	print("\nApplying FFT based method: ")
+	print("\nApplying FFT based method ")
 	local harness = require("lib/fft-matrixtestharness")
 	for _,f in ipairs(nfilter) do
 		for _,b in ipairs(blocksizes) do
@@ -148,7 +176,7 @@ if dotune then
 			                    	my_fastconv(nil,M,N,A,B,C,N,NF)
 								end)
 								-- if not correct then	("<error>")  break  end
-								print(b,rm,rn,v,t,curr_time)
+								if perf then print(b,rm,rn,v,t,curr_time) end
 								if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 									best = {time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filters = f, threads = t, method = "FFT based" }
 									if trackbest then
