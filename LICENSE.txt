@@ -1,5 +1,5 @@
 ===============================================================================
-Terra Release License
+OPKA-CL - OPtimized Kernels Auto-tuner for Convolution Layers - Beta
 ===============================================================================
 MIT License
 

@@ -3,6 +3,7 @@ require "direct"
 require "lowering"
 require "fftbased"
 
+
 -- General Parameters
 local dotune = true
 local filters = {3}
@@ -10,19 +11,9 @@ local nfilter = {20}
 local nthread = {8}
 local tunefor = 32
 local number = double
--- Flags
--- io.write("\n Optimal kernels for convolution layers auto-tuner \n")
--- io.write("\n              Stanford University \n")
--- io.write("              (mnovaes@stanford.edu) \n")
--- io.write("\n\n")
--- io.write("Flags\n")
--- io.write("perf: see all time or time on a parameter tested\n")
--- io.write("trackbest: every time you have a new best kernel, show its parameters\n")
--- io.write("\n")
--- local flags = io.read("*all")
 
 -- FLAGS
-local perf = false
+local silent = false
 local trackbest = false
 
 -- handle FLAGS 
@@ -32,12 +23,26 @@ repeat
 	argc = argc + 1
 until arg[argc] == nil
 
+
 for i=0, argc-1 do
 	local str = arg[i]
-	if str == "--perf" then
-		perf = true  
+	if str == "--silent" then
+		silent = true  
 	elseif str == "--trackbest" then
 		trackbest = true
+	elseif str == "--help" then
+		io.write("execution: terra [terra-options] <source-file> [arguments]\n")
+		io.write("	--silent: hide all time parameter tested results \n")
+		io.write("	--trackbest: see every time you have a new best kernel, show its parameters\n")
+		io.write("	--license: see license details\n")
+		return
+	elseif str == "--license" then
+		local f = io.open("../LICENSE.txt", "rb")
+    	local license = f:read("*all")
+    	f:close()
+		io.write(license)
+		print("\n")
+		return
 	end
 end
 
@@ -74,7 +79,7 @@ if dotune then
 					                    	my_conv(nil,Me,Ne,K,L,1.0,A,Me,Ne,B,L,C,M,N,K/2,L/2) -- my_conv receives integer parameter i.e. it represents floor of K/2 and L/2
 										end)
 										if not correct then	print("<error>") break end
-										if perf then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
+										if not silent then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
 										if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 											best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "direct" }
 											if trackbest then 
@@ -131,7 +136,7 @@ if dotune then
 									-- 	my_conv(nil,M,N,K,1.0,A,K,B,N,C,N)
 									-- end)
 									if not correct then	print("<error>") break end
-									if perf then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
+									if not silent then print(b,rm,rn,v,k,f,curr_time, "[OK]") end
 									if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 										best = { time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filter_size = k, filters = f, threads = t, method = "lowering" }
 										if trackbest then
@@ -176,7 +181,7 @@ if dotune then
 			                    	my_fastconv(nil,M,N,A,B,C,N,NF)
 								end)
 								-- if not correct then	("<error>")  break  end
-								if perf then print(b,rm,rn,v,t,curr_time) end
+								if not silent then print(b,rm,rn,v,t,curr_time) end
 								if best.time > curr_time then --  Maximization problem (the greater gflops, the better)
 									best = {time = curr_time, block_size = b, rm = rm, rn = rn, vector_size = v, filters = f, threads = t, method = "FFT based" }
 									if trackbest then
