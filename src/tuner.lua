@@ -2,11 +2,11 @@ require "direct"
 require "lowering"
 -- General Parameters
 local dotune = true
-local number = double
 local filters = {3}
 local nfilter = {20}
 local nthread = {8}
 local tunefor = 32
+local number = double
 -- Flags
 local perf = false -- see all time or gflops on a parameter tested
 local trackbest = false -- every time you have a new best kernel, show its parameters 
@@ -15,9 +15,9 @@ local method
 local best = { gflops = 0, filter_size = 3, filters = 3, block_size = 5, rm = 5, rn = 5, vector_size = 1, threads = 3, method = "direct"}
 
 -- Direct auto-tuner
-local blocksizes = {16}--{16,32,64}
-local regblocks = {1}--{1,2,4}
-local vectors = {1}--{1,2,4,8,16}
+local blocksizes = {16,32}
+local regblocks = {1,2,4}
+local vectors = {1}
 -- todo remove  jobs from kernel init
 local NBF = 5
 
@@ -69,7 +69,7 @@ if dotune then
 local blocksizes = {16}--{16,20,32}
 local regblocksM = {1}--{1,2,4}
 local regblocksN = {2}--{1,2,4}
-local vectors = {1}--{1,2,4,8}
+local vectors = {1,2,4,8}
 local NBF = 5
 local bl = 8 -- lowering blocksize
 

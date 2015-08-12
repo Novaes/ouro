@@ -310,7 +310,7 @@ end
 local terra loadAndRun(argc: int, argv: &rawstring)
   -- loading image
   var inp: Image
-  inp:load("images/lena.bmp")
+  inp:load("../images/lena.bmp")
 
   -- loading kernel
   var ker: Filter
@@ -324,11 +324,11 @@ local terra loadAndRun(argc: int, argv: &rawstring)
   
   var out: Image
   out = inp
-  out:save("images/lena_out.bmp")
+  out:save("../images/lena_out.bmp")
   out:free()
   return 0
 end
 
-terralib.saveobj("my_convolution.o",{ loadAndRun = loadAndRun })
+terralib.saveobj("../bin/my_imageconv.o",{ loadAndRun = loadAndRun })
 --run until it does not compare with another image convolution
-terralib.saveobj("my_convolution",{ main = loadAndRun })
+terralib.saveobj("../bin/my_imageconv",{ main = loadAndRun })
