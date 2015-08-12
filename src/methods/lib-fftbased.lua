@@ -580,26 +580,23 @@ function genfastconv(NB,NBF,RM,RN,V,FULLIMAGESIZE)
 	end
 end
 
-function genfftkernel(NFFT, signal) -- NFFT is equal to NB*NB
+function genfftkernel(NFFT, signal)
 	local A = symbol("A")
-	local stotal, rest, s, NELEMS, k, Ns = symbol("stotal"), symbol("rest"), symbol("s"), symbol("NELEMS"), symbol("k"), symbol("Ns")
-	local K_W, skernel, base, ublocks = symbol("K_W"), symbol("skernel"), symbol("base"), symbol("ublocks")
+	local stotal, rest, s = symbol("stotal"), symbol("rest"), symbol("s")
+	local NELEMS, k, Ns = symbol("NELEMS"), symbol("k"), symbol("Ns")
+	local K_W, skernel = symbol("K_W"), symbol("skernel")
+	local base, ublocks = symbol("base"), symbol("ublocks")
 	local ker = symmat("ker",2,2)
 	local exec, bitreversal = terralib.newlist(), terralib.newlist()
 	
 	local ker = {}
 	ker[0], ker[1] = {}, {}
-	ker[0][0] = 4 -- kernel of 4 points
-	ker[0][1] = 2 -- 2 stages
-	ker[1][0] = 2 -- kernel of 2 points
-	ker[1][1] = 1 -- 1 stage
- 	
+	ker[0][0], ker[0][1] = 4, 2 ---- kernel of 4 points; 2 stages
+	ker[1][0], ker[1][1] = 2, 1 -- kernel of 2 points; 1 stage
  	stotal = math.floor(math.log(NFFT)/math.log(2)) -- log2(NFFT) to #stages
 	rest = stotal
-	s = 0 -- current stage
+	s, k ,Ns = 0,0,1 -- current stage
 	NELEMS = NFFT
-	k = 0
-	Ns = 1
 	
 	repeat
 		-- #stages that type of kernel absorb is lower or equal lacking #stages
@@ -609,12 +606,9 @@ function genfftkernel(NFFT, signal) -- NFFT is equal to NB*NB
 			base  = 0
 			ublocks = NELEMS/K_W
 			rest = rest - skernel
-			-- cstdio.printf("#BLOCKS: %d  K_W: %d\n",ublocks,K_W)
-			-- cstdio.printf("#INNER ITER: %d\n",Ns)
 			for i=0,ublocks-1 do -- loop over big ublocks
 				base = i*(Ns*K_W*2) -- iterate over the big ublocks, K_W*2 each elem size
 				for j=0, Ns-1 do -- inside each block
-					-- cstdio.printf("BASE: %d Ns: %d\n",base + 2*j,Ns)
 					if k == 0 then
 						exec:insert(quote
 							FFT_4(base + 2*j,A,Ns,NFFT,signal)
@@ -634,7 +628,7 @@ function genfftkernel(NFFT, signal) -- NFFT is equal to NB*NB
 			k = k + 1
 		end
 	until rest == 0
-	
+
 	bitreversal:insert(quote
 		cbit.reversal(NFFT,A)
 	end)
@@ -642,8 +636,6 @@ function genfftkernel(NFFT, signal) -- NFFT is equal to NB*NB
 	return terra([A] : &double)
 		[exec];
 		[bitreversal];
-		-- printCMatrix("[4 kernel]:",NFFT,NFFT,A)
-		-- cstdio.printf("A: %1.f\n",A[0])
 	end
 end
 

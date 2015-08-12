@@ -1,5 +1,5 @@
 ===============================================================================
-OPKA-CL - OPtimized Kernels Auto-tuner for Convolution Layers - Beta
+Optimized Kernels Auto-tuner for Convolution Layers - Beta
 ===============================================================================
 MIT License
 
