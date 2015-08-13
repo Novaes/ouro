@@ -1,35 +1,34 @@
 ### Auto-tuner that builds optimized kernels for CNNs ###        
 
-    The three different methods to compute the convolution are each one in their branches: Direct Method (master), Lowering (wip/optlowering) and Convolution by FFT (wip/fastconvolution)
+    The three different methods to compute the convolution are each one in their branches: Direct Method (dev/direct-mt-mk), Lowering (dev/lowering-mt) and Convolution by FFT (wip/fastconvolution)
 
     requirements:
         Terra (github.com/zdevito/terra)
-        Accelerate framework for dgemm/convolution tests
-    
+
     running:
         image test: use makefile (It generates imageconv.o)
-        numerical tests: terra src/convolution.lua (it generates numconv.o)
+        numerical tests: terra src/convolution.lua (it generates dconv.o or sconv.o (Single/Double Precision) )
         *Make sure terra is in your $PATH or you have an alias to it
 
     most important branches: 
+        -> dev/master: it has all three methods merged.
         -> dev/direct-mt-mk: by Direct method (multi-threaded and over multiple-kernels)
         -> dev/lowering-mt: by Lowering (multi-threaded, using optimized GEMM)
         -> wip/fastconvolution: by FFT method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
-        wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
-        wip/mthreading: Direct method only multi-threading
-        wip/vectinstr: Direct method only using vecinstr
-        wip/benchmarks: Benchmark with MKL for Direct and FFT
+        dev/direct-vec: Direct method only using vecinstr
+        dev/direct-mt: 2D (Spatial) direct convolution
         
     most important files: 
-        src/convolution.lua: generates the numerical convolution over an image
-        references/convolution.cpp: future benchmarking with other implementations
+        src/tuner.lua: auto-tuner. It test the three methods. Use tuner.lua --help to see options.
+        benchmarks/convolution.c: main benchmarks with other implementations
+        src/imageconv.lua: generates an RGB image convolution
         src/examples/: some minimal code of implemented features
 
     libs:  
         image.t:image library (adapted to the project needs from github.com/jameshegarty/darkroom)
-        matrixtestharness.t: time measure in the auto-tuning process
-        multithreads.t: multi-thread library based on pthreads
-        fftkernels.t: n-point kernels for FFT
+        <method>-matrixtestharness.t: time measure in the auto-tuning process. 
+        <method>-mthreads: multi-thread library based on pthreads
+        fft-kernels.t: n-point kernels for FFT
 
     branching tags:
       wip: works in progress
