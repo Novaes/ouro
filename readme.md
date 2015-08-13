@@ -38,6 +38,4 @@
       dev: different version or with some specific feature
     
     tags:
-      v1.0: no pointer optimization
-      v1.5: vector optimization
-      v2.0: standard direct
+      v1.0
