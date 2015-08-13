@@ -21,7 +21,7 @@
         src/examples/: some minimal code of implemented features
 
     libs:  
-        image.t:image library (adapted to the project needs from github.com/jameshegarty/darkroom)
+        image.t:image library (from github.com/jameshegarty/darkroom)
         <method>-matrixtestharness.t: time measure in the auto-tuning process
         <method>-multithreads.t: multi-thread library based on pthreads
         fft-kernels.t: n-point kernels for FFT
