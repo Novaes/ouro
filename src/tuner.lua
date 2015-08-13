@@ -3,18 +3,20 @@ require "direct"
 require "lowering"
 require "fftbased"
 
-
 -- General Parameters
 local dotune = true
 local filters = {3}
 local nfilter = {20}
-local nthread = {8}
+local nthread = {4}
 local tunefor = 32
 local number = double
 
 -- FLAGS
 local silent = false
 local trackbest = false
+local nodirect = false
+local nolowering = false
+local nofft = false
 
 -- handle FLAGS 
 local argc = 0
@@ -30,11 +32,20 @@ for i=0, argc-1 do
 		silent = true  
 	elseif str == "--trackbest" then
 		trackbest = true
+	elseif str == "--nodirect" then
+		nodirect = true
+	elseif str == "--nolowering" then
+		nolowering = true
+	elseif str == "--nofft" then
+		nofft = true
 	elseif str == "--help" then
 		io.write("execution: terra [terra-options] <source-file> [arguments]\n")
 		io.write("	--silent: hide all time parameter tested results \n")
 		io.write("	--trackbest: see every time you have a new best kernel, show its parameters\n")
 		io.write("	--license: see license details\n")
+		io.write("	--nodirect: do not compute direct\n")
+		io.write("	--nolowering: do not compute lowering\n")
+		io.write("	--nofft: do not compute FFT based\n")
 		return
 	elseif str == "--license" then
 		local f = io.open("../LICENSE.txt", "rb")
@@ -57,7 +68,7 @@ local vectors = {1}
 -- todo remove  jobs from kernel init
 local NBF = 5
 
-if dotune then
+if dotune and not nodirect then
 	print("\nApplying Direct method ")
 	local harness = require("lib/dir-matrixtestharness")
 	for _,k in ipairs(filters) do
@@ -105,7 +116,7 @@ local vectors = {1,2,4,8}
 local NBF = 5
 local bl = 8 -- lowering blocksize
 
-if dotune then
+if dotune and not nolowering then
 	print("\nApplying Lowering method ")
 	local harness = require("lib/low-matrixtestharness")
 	for _,t in ipairs(nthread) do
@@ -160,7 +171,7 @@ local vectors = {1--[[1,2,4,8]]}
 local NBF = 1
 
 -- kernel dependent 
-if dotune then
+if dotune and not nofft then
 	print("\nApplying FFT based method ")
 	local harness = require("lib/fft-matrixtestharness")
 	for _,f in ipairs(nfilter) do
