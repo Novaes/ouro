@@ -1,4 +1,4 @@
-### Auto-tuner that builds optimized kernels for CNNs ###        
+### Auto-tuner that builds optimized kernels for Convolution Layers on CNNs ###        
 
     The three different methods to compute the convolution are each one in their branches: Direct Method (dev/direct-mt-mk), Lowering (dev/lowering-mt) and Convolution by FFT (wip/fastconvolution)
 
