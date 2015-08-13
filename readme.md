@@ -3,8 +3,7 @@
     The three different methods to compute the convolution are each one in their branches: Direct Method (master), Lowering (wip/optlowering) and Convolution by FFT (wip/fastconvolution)
 
     requirements:
-        Terra (github.com/zdevito/terra)
-        Accelerate framework for dgemm/convolution tests
+        Terra (github.com/zdevito/terra
     
     running:
         image test: use makefile (It generates imageconv.o)
@@ -12,9 +11,9 @@
         *Make sure terra is in your $PATH or you have an alias to it
 
     most important branches: 
-        -> dev/direct-mt-mk: by Direct method (multi-threaded and over multiple-kernels)
-        -> dev/lowering-mt: by Lowering (multi-threaded, using optimized GEMM)
-        -> wip/fastconvolution: by FFT method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
+        -> Direct Method (multi-threaded and auto-tuned)
+        -> Lowering (multi-threaded, using optimized GEMM)
+        -> FFT-based method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
         wip/tuneNumOfKernels: Direct method auto-tuning the number of kernels
         wip/mthreading: Direct method only multi-threading
         wip/vectinstr: Direct method only using vecinstr
