@@ -1,6 +1,6 @@
 ### Auto-tuner that builds optimized kernels for CNNs ###        
 
-    It run three different methods to compute the convolution: Direct Method, Lowering and Convolution by FFT and give the best method .o, given the parameters of the Convolution layer.
+    It runs the three main methods to compute the convolution: Direct Method, Lowering and Convolution by FFT and give the best method .o, given the parameters of the Convolution layer.
 
     requirements:
         Terra (github.com/zdevito/terra)
