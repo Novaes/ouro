@@ -36,4 +36,4 @@
     tags:
       v1.0
 
-    Note: the FFT-based has accuracy errors and will be improved.
+    Note: the FFT-based has accuracy errors and the idea is improve it and fix an upper-bound to round-off errors
