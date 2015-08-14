@@ -1,7 +1,9 @@
 ### Ouro         
     It is an Auto-tuner that builds optimized kernels for ConvNets
 
-    Given convolution parameters, It runs the three main convolution methods: Direct Method, Lowering and FFT-based. Then, it gives the best method .o and auto-tuned parameters. The project is multi-staged. It uses Lua as a high-level language and Terra as the low-level staged code. 
+    Given convolution parameters, It runs the three main convolution methods: Direct Method, 
+    Lowering and FFT-based. Then, it gives the best method .o and auto-tuned parameters. 
+    The project is multi-staged. It uses Lua as a high-level language and Terra as the low-level staged code. 
 
     requirements:
         Terra (github.com/zdevito/terra)
@@ -18,7 +20,8 @@
         -> Lowering (multi-threaded, using optimized GEMM))
         State of the art of the method: http://arxiv.org/abs/1504.04343
         -> FFT-based method (also called: "Fast Convolution") 
-        Features: Multi-threaded, using: 2-points and 4-points FFT kernels, kernel for transpose  and kernel for point-wise multiplication (blocked and auto-tuned)
+        Features: Multi-threaded, using: 2-points and 4-points FFT kernels, kernel for transpose  
+    and kernel for point-wise multiplication (blocked and auto-tuned)
         State of the art of the method: http://arxiv.org/abs/1412.7580  
     
    
