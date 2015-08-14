@@ -1,0 +1,610 @@
+ss{beamer}
+
+% There are many different themes available for Beamer. A comprehensive
+% list with examples is given here:
+% http://deic.uab.es/~iblanes/beamer_gallery/index_by_theme.html
+% You can uncomment the themes below if you would like to use a different
+% one:
+%\usetheme{AnnArbor}
+%\usetheme{Antibes}
+%\usetheme{Bergen}
+%\usetheme{Berkeley}
+%\usetheme{Berlin}
+%\usetheme{Boadilla}
+%\usetheme{boxes}
+%\usetheme{CambridgeUS}
+%\usetheme{Copenhagen}
+%\usetheme{Darmstadt}
+%\usetheme{default}
+%\usetheme{Frankfurt}
+%\usetheme{Goettingen}
+%\usetheme{Hannover}
+%\usetheme{Ilmenau}
+%\usetheme{JuanLesPins}
+%\usetheme{Luebeck}
+\usetheme{Madrid}
+%\usetheme{Malmoe}
+%\usetheme{Marburg}
+%\usetheme{Montpellier}
+%\usetheme{PaloAlto}
+%\usetheme{Pittsburgh}
+%\usetheme{Rochester}
+%\usetheme{Singapore}
+%\usetheme{Szeged}
+%\usetheme{Warsaw}
+\usepackage{graphicx}
+\graphicspath{ {images/} }
+
+\title{Auto-tuner that builds optimized kernels for convolution layers on CNNs}
+
+
+\author{Marcelo P. Novaes\inst{1}\inst{2}}
+% - Give the names in the same order as the appear in the paper.
+% - Use the \inst{?} command only if the authors have different
+%   affiliation.
+
+\institute[Stanford University] % (optional, but mostly needed)
+{
+  \inst{1}%
+  Pervasive Parallelism Laboratory\\
+  Stanford University
+  \and
+  \inst{2}%
+  Department of Computer Science\\
+  Universidade Federal da Bahia (UFBA)
+}
+% - Use the \inst command only if there are several affiliations.
+% - Keep it simple, no one is interested in your street address.
+
+\date{Summer, 2015}
+% - Either use conference name or its abbreviation.
+% - Not really informative to the audience, more for people (including
+%   yourself) who are reading the slides online
+
+\subject{Theoretical Computer Science}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+\AtBeginSubsection[]
+{
+  \begin{frame}<beamer>{Outline}
+    \tableofcontents[currentsection,currentsubsection]
+  \end{frame}
+}
+
+% Let's get started
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+  \tableofcontents
+  % You might wish to add the option [pausesections]
+\end{frame}
+
+% Section and subsections will appear in the presentation overview
+% and table of contents.
+\section{Introduction}
+
+\subsection{Convolutional Neural Networks}
+
+\begin{frame}{Convolutional Neural Networks}
+\begin{itemize}
+  \item {
+Neural Network which exploit the spatially-local correlation of input
+  }
+  \item {
+  one of the most promising techniques to tackle large scale learning problems
+  }
+  \item {
+    core to applications such as as image and face recognition, audio and speech processing and natural language understanding
+  }
+  \item {
+  composed by three main layers: convolution, pooling (sub-sampling) and fully-connected (usually the last)
+  }
+  \item {
+   Their bottleneck are the convolution layers, responsible for most part of the computation on Convolutional Neural Networks (between 70\% to 90\%)
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Convolutional Neural Networks}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=5cm, height=2.5cm]{cs231-cnn}
+ \caption{Convolutional Neural Network [6]} 
+\includegraphics[width=6cm, height=3.5cm]{kernel_convolution}
+ \caption{Spatial  Convolution \scalebox{.2}{https://developer.apple.com/library/ios/documentation/Performance/Conceptual/vImage/ConvolutionOperations/ConvolutionOperations.html}} 
+ 
+\end{figure}
+\end{frame}
+\begin{frame}{Convolutional Neural Networks}{Convolution Operation}
+
+    \begin{block}{Discrete Convolution}
+    $(f * g)[n]\ \stackrel{\mathrm{def}}{=}\     \sum_{m=-\infty}^\infty f[m]\, g[n - m]$
+    \end{block}
+    \begin{block}{Circular Discrete Convolution}
+    $(f * g_N)[n] \equiv \sum_{m=0}^{N-1} \left(\sum_{k=-\infty}^\infty {f}[m+kN] \right) g_N[n-m]$, $g_N$ is periodic, with period N
+    \end{block}
+  
+  \begin{itemize}
+  \item {
+    Direct and Lowering compute the finite discrete convolution.
+    }
+  \item {
+    FFT-based computes a circular discrete convolution
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Convolutional Neural Networks}{Trade-offs}
+  \begin{itemize}
+  \item {
+    FFT-based has the best 2D Time Complexity $\theta(nlogn)$. It can have numerical problem (round-off leading to inaccuracy), windowing problems (circular conv.) and large amount of memory wasted with padding (e.g. power of 2 and same sizes).
+  }
+  \item {
+    Lowering has pre-computation that also requires memory expansion and pos-computation. Relies on contiguous memory (cache friendly use) of blocked GEMM.
+  }
+  \item {
+    Direct method has to deal with boundary cases (solution can be padding also), has non-contiguous memory problems and it is usually optimized only for part of the usual deep learning parameter space.
+  }
+  \end{itemize}
+\end{frame}
+
+
+\subsection{Multi-stage programming with Lua and Terra}
+
+\begin{frame}{Multi-stage programming with Lua and Terra}{Some Terra Properties}
+  \begin{itemize}
+  
+  \item {
+    Interoperability without Glue (e.g. shared lexical environment)
+  }
+    
+   \item {   
+    Low level of abstraction suited
+for writing high-performance code (e.g. vector instruction, memory manually managed, prefetching intrinsics)
+  }
+
+  \item {   
+    Backwards compatible with C
+  }
+
+  \item {   
+    Others: Hygienic staging programming, type reflection. About Lua: tables and functions as first-class citizens. 
+  }
+ 
+  \item {   
+    During development: active support, nice documentation, tests/ examples and functions such as disas() and printpretty().
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Multi-stage programming with Lua and Terra}{Cool uses}
+ \begin{figure}[ht] \label{fig1} 
+\includegraphics[width=6cm, height=3cm]{code-blockedCloop}
+ \caption{A blocking example for complex numbers} 
+\includegraphics[width=6cm, height=1.2cm]{code-number}
+ \caption{Single/Double Precision (all computation done over number)} 
+\end{figure}
+\end{frame}
+
+\subsection{Project specification}
+
+\begin{frame}{Project specification}
+\begin{itemize}
+  \item {
+    Given necessity of different convolution methods for different convolution layers
+  }
+   \item {   
+    Given Terra flexibility
+  }
+\end{itemize}
+
+\begin{block}{}
+ Build an auto-tuner that generates optimized kernels for convolution layers. Given convolution layer parameters, decide the best method and auto-tuned parameters.
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Project specification}
+ \begin{figure}[ht] \label{fig1} 
+\includegraphics[width=10cm, height=5cm]{auto-tune}
+ \caption{Search for the best execution time over the three methods} 
+\end{figure}
+\end{frame}
+
+\section{Development}
+
+\subsection{Direct}
+
+\begin{frame}{Direct}{2D Convolution (Spatial)}
+
+  \begin{itemize}
+  \item {
+   Approach based on Terra's GEMM auto-tuner
+  }
+   \item {   
+    Features: 3-level blocking, variable reuse on blocking (pointer optimization), pre-load filter, data prefetching, Multi-thread (using C pthreads).
+  }
+   \item {   
+    Implemented, but not used to generate results (due to low performance): vector instruction based on AVX dot product, vector instruction based on multiplication and AVX hadd, vector instruction multiply and iteration (they are on tests/direct-vec).
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Direct 2D}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=9cm, height=5cm]{chart-variation}
+ \caption{Example of Gflops variation over blocking parameters} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Direct}{2D Convolution (Spatial)}
+    \begin{figure}[ht] \label{fig1} 
+        \includegraphics[width=10cm, height=5cm]{max-direct-2d}
+        \caption{Optimum points (Double precision)} 
+    \end{figure}
+\end{frame}
+\begin{frame}{Direct}{3D Convolution (filter batch)}
+  \begin{itemize}
+  \item {
+   Extension for filter batch.
+  }
+  \item {
+   Uses the maximum image reuse approach.
+  }
+   \item {   
+    Same features as Direct 2D plus the maximum image reuse during each 3rd level blocking.
+  }
+  \item {   
+    Drawback: slides over memory for each mini-block.
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Direct}{3D Convolution (filter batch)}
+\begin{figure}[ht] \label{ fig7} 
+      \includegraphics[width=8cm, height=5cm]{nker-dir}
+    \caption{Execution time by number of kernels} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Direct}{3D Convolution (filter batch)}
+\begin{figure}[ht] \label{ fig7} 
+     \includegraphics[width=8cm, height=5cm]{kersize-dir}
+    \caption{Execution time by kernel size} 
+\end{figure}
+\end{frame}
+
+
+\subsection{Lowering}
+
+\begin{frame}{Lowering}
+  \begin{itemize}
+  \item {
+    Goal: contiguous memory access when applying image to filter
+  }
+  \item {
+   It is composed by three steps: (1) Lowering, (2) Matrix Multiplication, (3) Lifting
+  }
+  \item {
+   Drawbacks: Memory expansion on image lowering. Input preparation (lowering of image and filter). Pos-computaiton lifting the result back. 
+  }
+  \item {
+   Relies on efficiency of GEMM libraries such as MKL  GEMM, ATLAS, OpenBLAS (GOTO2BLAS), cuBLAS (for GPUs). 
+  }
+  \item {   
+    Features: Blocked image lowering, Multi-threaded (by C pthreads) standard Terra's GEMM (variable reuse, data prefetching, vector instruction, 3-level blocking).
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Lowering}{Image}
+\begin{figure}[ht] \label{ fig7} 
+  \begin{minipage}[b]{0.5\linewidth}
+      \includegraphics[width=5cm, height=3cm]{draw-inputs}
+    \caption{Tensors inputs} 
+  \end{minipage} 
+
+  \begin{minipage}[b]{0.5\linewidth}
+     \includegraphics[width=5cm, height=2cm]{draw-image-lowering}
+    \caption{Image lowering} 
+  \end{minipage}
+  \hfill
+\end{figure}
+\end{frame}
+
+\begin{frame}{Lowering}{Image}
+\begin{figure}[ht] \label{ fig8} 
+    \includegraphics[width=5cm, height=2cm]{draw-gemm-out} 
+    \caption{Output (C) obtained from lowered image (A) multiplied by lowered kernel (B)} 
+    
+    \includegraphics[width=5cm, height=2cm]{draw-lowering-out}
+    \caption{Convolution correspondence of each output element} 
+    \end{figure}
+\end{frame}
+
+ \begin{frame}{Lowering}{Results}
+\begin{figure}[ht] \label{ fig7} 
+      \includegraphics[width=8cm, height=5cm]{nker-low}
+    \caption{Execution time by number of kernels} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Lowering}{Results}
+\begin{figure}[ht] \label{ fig7} 
+     \includegraphics[width=8cm, height=5cm]{kersize-low}
+    \caption{Execution time by kernel size} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Lowering}{Results}
+\begin{figure}[ht] \label{ fig7} 
+     \includegraphics[width=10cm, height=6cm]{decomp-low}
+    \caption{Decomposition cost (before blocking on image lowering step)} 
+\end{figure}
+\end{frame}
+
+\subsection{FFT based (also called "Fast Convolution")}
+
+\begin{frame}{FFT based (also called "Fast Convolution")}{Multi-stage approach}
+  \begin{itemize}
+  \item {
+    Convolution in geometric space amounts to point-wise multiplication (modulation) in frequency space. Theorem on DSP: $f * g = FT_i(FT(f).FT(g))$
+  }
+
+  \item {
+    We are concerned on Periodic and Discrete Fourier Transform and its inverse. The naive DFT takes \theta(n$^{2}$).  
+  }
+  \item {
+   By the Colley-Turkey divide-and-conquer algorithm, we can compute it in $\theta(nlogn)$. The algorithm is called \alert{Fast Fourier Transform (FFT)}. There are many variations of Colley-Turkey algorithm, the chosen one was the radix-$2$ (easier implementation and better accuracy, according to $[1]$).
+  }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{FFT based (also called "Fast Convolution")}{Steps}
+  \begin{itemize}
+        \item {
+           Convolution Steps
+          }
+      \begin{itemize}
+          \item {
+           2D FFT on image
+          }
+          \item {
+           2D FFT on filter
+          }
+          \item {
+           Point-wise multiplication
+          }
+          \item {
+           2D $FFT_i$ of the result
+          }
+      \end{itemize}
+      \item {
+           2D FFT steps
+          }
+      \begin{itemize}
+          \item {
+           1D FFT over one dimension of the matrix (e.g. on each row)
+          }
+          \item {
+           Transpose resulting matrix
+          }
+          \item {
+           1D FFT again over same dimension
+          }
+          \item {
+           Transpose back the matrix
+          }
+      \end{itemize}
+       \item {
+            The transposition was done in order to improve locality and therefore better cache use.
+         }
+          \item {
+            Features: Multi-stage computation on n-point kernels, Complex multiplication auto-tuned kernel (3-level blocking, variable reuse),  multi-thread.
+         }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{FFT based (also called "Fast Convolution")}{Code}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=5cm, height=6cm]{code-genfft}
+ \caption{Multi-staged kernel for FFT} 
+\end{figure}
+
+\end{frame}
+
+\section{Experiments}
+\subsection{Comparison with the state of the art}
+\begin{frame}{Comparison with the state of the art}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=7cm, height=5cm]{2d}
+ \caption{Spatial (2D) Direct Convolution} 
+\end{figure}
+
+\end{frame}
+\begin{frame}{Comparison with the state of the art}{Direct}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=10cm, height=5cm]{mkl-sp}
+ \caption{MKL Gflops table for Core i7} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Comparison with the state of the art}{Direct}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=10cm, height=5cm]{mkl-cmp-sp}
+ \caption{Gflops table for Core i5} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Comparison with the state of the art}{Lowering}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=5cm, height=5cm]{cct-table}
+ \caption{Lowering vs Caffe con Troll. Considering only one image with depth = 1 (b=1) and stride = 1 (s=1).} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Comparison with the state of the art}{FFT based}
+\begin{figure}[htc] \label{fig1} 
+\includegraphics[width=8cm, height=5cm]{chart-fftlog}
+ \caption{2D FFT-based convolution} 
+\end{figure}
+\end{frame}
+
+\subsection{Comparison between approaches}
+
+\begin{frame}{Comparison between approaches}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=8cm, height=5cm]{all-nkernels}
+ \caption{Small image (32x32) and small kernel (7x7). As expected Direct and Lowering better than FFT.} 
+\end{figure}
+\end{frame}
+
+\begin{frame}{Comparison between approaches}
+\begin{figure}[ht] \label{fig1} 
+\includegraphics[width=12cm, height=4cm]{direct-lowering}
+ \caption{Direct vs Lowering} 
+\end{figure}
+\end{frame}
+
+\section{Conclusion}
+\subsection{Limitations and suggested improvements}
+\begin{frame}{Limitations and suggested improvements}
+  \begin{itemize}
+  \item {
+   The optimization was focused on one image. So, it will only be efficient for a small depth, e.g. a RGB image (depth = 3). For greater ones, more optimizations should be done.
+  }
+  \item {
+   Direct: Re-think strategies for vector instruction, e.g. activate it only for some kernel sizes. 
+  }
+  \item {
+   Lowering: Multi-thread lowering, multi-thread and block transpose kernel. Maybe implement the fusion changing the Terra's GEMM kernel (it would be easy once GEMM kernel is in Terra also).
+  }
+  \item {
+   FFT: CGEMM instead of the CMULT (such as fbfft [4]), twidle factors reuse, twidle factors during staging. Ovearlap-add and overlap-save as "blocking" methods for the small kernels. 
+  }
+  \item {
+  FFT has accuracy problems, one has to define an upper bound of this round-off error.
+  }
+  \end{itemize}
+\end{frame}
+\subsection{Products, possible future steps and summer experience}
+\begin{frame}{Product, possible future steps and summer experience}
+  \begin{itemize}
+  \item {
+   Code and documentation on GitHub
+  }
+  \item {
+   Possible future steps: Optimization for image batches.    Provide the others CNN layers.
+  }
+  \end{itemize}
+\end{frame}
+
+\subsection{Acknowledgments}
+
+\begin{frame}{Acknowledgments}
+
+\end{frame}
+
+% Placing a * after \section means it will not show in the
+% outline or table of contents.
+\section*{Summary}
+
+\begin{frame}{Summary}
+  \begin{itemize}
+  \item
+   An integrated multi-staged implementation of the three convolution approaches was done.
+  \item
+    Each one of the methods  \alert{seems to be efficient compared with the state of the art} (more tests are necessary for FFT).
+  \item
+    The implementation of the methods seems to be complementary \alert{considering the usual deep learning parameter space}.
+  \end{itemize}
+  
+  \begin{itemize}
+  \item
+    Outlook
+    \begin{itemize}
+    \item
+      Apply possible optimization on patch of images 
+       \item
+      Necessary a faster FFT (base code is there, do more n-kernels and suggested optimizations)
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+
+
+% All of the following is optional and typically not needed. 
+\appendix
+\section<presentation>*{\appendixname}
+\subsection<presentation>*{For Further Reading}
+
+\begin{frame}[allowframebreaks]
+  \frametitle<presentation>{For Further Reading}
+    
+  \begin{thebibliography}{10}
+    
+  \beamertemplatebookbibitems
+  % Start with overview books.
+
+% WARNING: The bibterms are wrong
+  \bibitem{TeVeFl1992}
+    Teukolsky, Vetterling and Flannery
+    \newblock {\em The Art of Scientific Computing}.
+    \newblock Cambridge University Press, 1992.
+ 
+    
+  \beamertemplatearticlebibitems
+  % Followed by interesting articles. Keep the list short. 
+    
+    \bibitem{TERRA13}
+    DeVito Z., Hegarty J., Aiken A., Hanrahan P. and Vitek J. 
+    \newblock Terra: A Multi-Stage Language for High-Performance Computing 
+    \newblock {\em PLDI}, 2013.
+    
+    \bibitem{CaffeConTroll2015}  
+    Hadjis S.,  Abuzaid F., Zhang C. and R\'e C.
+    \newblock Caffe con Troll: Shallow Ideas to Speed Up Deep Learning
+     \newblock {\em arXiv:1504.04343}, 2015
+    
+    \bibitem{FBFFT2015}
+    Vasilache N., et al. 
+    \newblock On Fast Convolutional Nets With fbfft: A GPU Performance Evaluation.
+    \newblock {\em arXiv: 1412.7580}, 2015.
+    
+    \bibitem{cuDNN2014} 
+    Chetlur S., et al.
+    \newblock cuDNN: Efficient Primitives for Deep Learning
+    \newblock {\em arXiv:1410.0759v3}, 2014.
+    
+    \bibitem{CS231}
+   Li F. and Karpathy A.
+    \newblock Convolutional Neural Networks for Visual Recognition (CS231n)
+    \newblock {\em Stanford University}, 2014.
+    
+    \bibitem{ParLab2014}
+    Iandola, F.N.; Sheffield, D.; Anderson, M.J.; Phothilimthana, P.M.; Keutzer, K., 
+    \newblock Communication-minimizing 2D Convolution In GPU Registers
+    \newblock {\em  International Conference on Image Processing (ICIP)}, 2013.
+    
+     \bibitem{AMD2011}
+    AMD Developer Center
+    \newblock OpenCL Optimization Case Study Fast Fourier Transform - Parts 1 and 2
+    \newblock {\em AMD Articles}, 2011.
+    
+  \end{thebibliography}
+\end{frame}
+
+\end{document}
