@@ -10,7 +10,7 @@
         Terra is a low level language created with inoperability with Lua in mind. 
 
     running:
-        image test: use the makefile (It generates imageconv.o)
+        image test: use the makefile (It generates binary my_convolution, then execute it with the kernel(s) and image(s) convolved is on images/)
         numerical tests: terra src/tuner.lua (it generates dconv.o or sconv.o)
         You can run it as terra src/tuner.lua --help to see how it works or just see the code. 
         *Make sure terra is in your $PATH or you have an alias to it
