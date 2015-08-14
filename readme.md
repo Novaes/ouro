@@ -1,6 +1,7 @@
-### Auto-tuner that builds optimized kernels for CNNs ###        
+### Ouro         
+    It is an Auto-tuner that builds optimized kernels for ConvNets
 
-    It runs the three main methods to compute the convolution: Direct Method, Lowering and Convolution by FFT and give the best method .o, given the parameters of the Convolution layer.
+    Given convolution parameters, It runs the three main convolution methods: Direct Method, Lowering and FFT-based and give the best method .o and auto-tuned parameters.
 
     requirements:
         Terra (github.com/zdevito/terra)
@@ -34,3 +35,5 @@
     
     tags:
       v1.0
+
+    Note: the FFT-based has accuracy errors and will be improved.
