@@ -30,7 +30,7 @@
       wip: works in progress
       junk: experiments
       bug: fixing a bug
-      dev: different version or with some specific feature
+      dev: intermediate developments (to be put on tests/ folder) or with some specific feature
     
     tags:
       v1.0
