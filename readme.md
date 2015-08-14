@@ -1,21 +1,27 @@
 ### Ouro         
     It is an Auto-tuner that builds optimized kernels for ConvNets
 
-    Given convolution parameters, It runs the three main convolution methods: Direct Method, Lowering and FFT-based and give the best method .o and auto-tuned parameters.
+    Given convolution parameters, It runs the three main convolution methods: Direct Method, Lowering and FFT-based. Then, it gives the best method .o and auto-tuned parameters. The project is multi-staged. It uses Lua as a high-level language and Terra as the low-level staged code. 
 
     requirements:
         Terra (github.com/zdevito/terra)
-    
+        Terra is a low level language created with inoperability with Lua in mind. 
+
     running:
-        image test: use makefile (It generates imageconv.o)
-        numerical tests: terra src/convolution.lua (it generates numconv.o)
+        image test: use the makefile (It generates imageconv.o)
+        numerical tests: terra src/tuner.lua (it generates dconv.o or sconv.o)
+        You can run it as terra src/tuner.lua --help to see how it works or just see the code. 
         *Make sure terra is in your $PATH or you have an alias to it
 
     most important branches: 
-        -> Direct Method (multi-threaded and auto-tuned)
-        -> Lowering (multi-threaded, using optimized GEMM)
-        -> FFT-based method (using kernels: FFTKERNELS, TRANSPOSE and CMULT)
-        
+        -> Direct Method 
+        -> Lowering (multi-threaded, using optimized GEMM))
+        State of the art of the method: http://arxiv.org/abs/1504.04343
+        -> FFT-based method (also called: "Fast Convolution") 
+        Features: Multi-threaded, using: 2-points and 4-points FFT kernels, kernel for transpose  and kernel for point-wise multiplication (blocked and auto-tuned)
+        State of the art of the method: http://arxiv.org/abs/1412.7580  
+    
+   
     most important files: 
         src/tuner.lua: auto-tuner that iterates over the three methods 
         benchmarks/: benchmarking with other implementations
