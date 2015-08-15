@@ -1,5 +1,5 @@
 ### Ouro         
-    It is an Auto-tuner that builds optimized kernels for ConvNets
+    Auto-tuner that builds optimized kernels for Convolution Layers on ConvNets
 
     Given convolution parameters, It runs the three main convolution methods: Direct Method, 
     Lowering and FFT-based. Then, it gives the best method .o and auto-tuned parameters. 
@@ -7,14 +7,13 @@
 
     requirements:
         Terra (github.com/zdevito/terra)
-        Terra is a low level language created with inoperability with Lua in mind. 
+        Terra is a low-level language created with interoperability with Lua in mind. 
 
     running:
-        image test: use the makefile (summarily: terra src/imageconv.lua && ./my_convolution <kernel>).                
-        Images are stored on /images.
-        numerical tests: terra src/tuner.lua (it generates dconv.o or sconv.o)
-        You can run it as terra src/tuner.lua --help to see how it works or just see the code. 
-        *Make sure terra is in your $PATH or you have an alias to it
+        <terra binary> src/tuner.lua (it generates dconv.o or sconv.o)
+        You can run it as terra src/tuner.lua --help to see how it works and some flags or just see the code. 
+        *Find the terra binary and run it or just make sure terra is in your $PATH or you have an alias to it
+        image test: use the makefile (summarily: terra src/imageconv.lua && ./my_convolution <kernel>)       Images are stored on /images.
 
     most important branches: 
         -> Direct Method 
@@ -46,4 +45,4 @@
     tags:
       v1.0
 
-    Note: the FFT-based has accuracy errors and the idea is improve it and fix an upper-bound to round-off errors
+    Note: the FFT-based has accuracy errors and the idea is to improve it and fix an upper-bound to round-off errors
