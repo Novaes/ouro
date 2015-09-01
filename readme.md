@@ -1,5 +1,5 @@
 ### Ouro         
-    Auto-tuner that builds optimized kernels for Convolution Layers on ConvNets
+    Auto-tuner that builds optimized kernels for Convolutional Layers on ConvNets
 
     Given convolution parameters, It runs the three main convolution methods: Direct Method, 
     Lowering and FFT-based. Then, it gives the best method .o and auto-tuned parameters. 
